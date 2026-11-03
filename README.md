@@ -1,4 +1,4 @@
-# Matryo
+# Banana for Scale (repo: matryo)
 
 Daily word game: today's place and a big thing to start from (A BASEBALL GAME · STADIUM). Name smaller and smaller things in 60 seconds.
 
@@ -17,20 +17,19 @@ tools/              scripts and source files for words, categories and the sched
 review/             spreadsheet of every word for you to check
 ```
 
-## Rules (what players see) · v0.4 beta "Snug"
-1. Seven quick rounds a day. Each names a real space: in a suitcase, through a door, on a table, in your pants pocket, on a sofa.
-2. You have 25 seconds to name the biggest thing that still fits.
-3. After each round, a scale shows how snug your fit was (rattles around → snug fit), plus hand-picked snug answers. Tap Next for the next round.
-4. Pause from the top-left: two pauses per daily, a third ends it. Closing or reloading mid-round counts as a pause.
+## Rules (what players see) · v0.5 beta "Banana for Scale"
+Five rounds a day, 20 seconds each. Every round asks one question in the same shape:
+"How many bananas long is a school bus?" Players type a number (1200, 1,200 and 1.2k all work).
 
 ## Scoring
-- Within 5% of the space's size = 100. Smaller things score whole-number points sliding down to 10 at about 2.5 sizes smaller (one size = 1.5×).
-- More than 5% too big doesn't fit: try again while the clock runs. Open spaces (baskets, carts, beds, anything "on", doors and elevators, which you can tilt things through) accept things up to ~35% bigger. The space itself and kinds of it don't count.
-- Specific is snugger: each level more specific than the everyday word counts 0.1 sizes closer (up to 0.3).
-- A day is out of 700. Share marks: 📦 perfect fit · 🟧 60+ · 🟨 30+ · ⬜ under 30. Each word shows its % and can be used once a day.
+How far off a guess is gets measured in multiples, the same in both directions.
+Within 10% of the answer = 100. 2x off ≈ 73, 5x off ≈ 31, 10x off or more = 0. Max 500 a day.
+Share marks: 🍌 90+, 🟨 60+, 🟫 30+, ⬜ under 30.
 
 ## Daily schedule
-The spaces live in `tools/fits.txt` (`phrase | word | usable inside size in cm | snug examples`). The build checks every example against the game's own sizes and only shows the ones that score 60+; it prints spaces with fewer than 2 good examples so you can tune them. `python3 tools/make_snug.py 2026-11-03 365` writes `data/fits.json` and `data/dailies.json`: 2 small, 3 medium and 2 big spaces a day, in a random order, every space used once before any repeat (120 spaces ≈ a repeat every 17 days; add lines to stretch that).
+Items live in `tools/scale_items.txt` (`name | plural | article | long/tall/across | cm | u`, where `u` means it can be the counting unit).
+Edit sizes there, then run `python3 tools/make_scale.py` to rebuild `data/items.json` and `data/dailies.json` (365 days from 2026-11-03).
+Each day mixes small to huge answers, and the thing being measured doesn't repeat within 10 days.
 
 ## Going live (about 15 minutes, Netlify only)
 
@@ -43,7 +42,7 @@ No database account and no sign-in providers. Netlify hosts the game, runs the s
 5. **Domain management → Add a domain** → `matryo.io`, then follow Netlify's DNS steps at your registrar. HTTPS turns on by itself.
 6. **Check it:** play a daily, open `matryo.io/admin.html`, enter the password. Today's visitors and the finished round should show (daily stats refresh hourly and every time you open the page). Netlify → Functions shows `words-daily` (daily) and `stats-hourly` (hourly) as scheduled.
 
-## Accepting new words (no AI)
+## Accepting new words (no AI) · used by v0.4, not by v0.5
 
 There is no AI anywhere in the game or its server jobs. New words come from players and from you.
 

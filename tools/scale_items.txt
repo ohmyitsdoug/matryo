@@ -1,0 +1,156 @@
+# Banana for Scale items. One line each:
+#   name | plural | article | how it's measured | cm | u
+# "how it's measured" is the word used in the question: long, tall or across.
+# u = can be the counting unit ("how many BANANAS long..."). Everything can be the thing measured.
+# Pick things that don't vary much, and use a typical adult/standard size. Landmarks use their official height.
+grain of rice | grains of rice | a | long | 0.65 | u
+sesame seed | sesame seeds | a | long | 0.3 | u
+ant | ants | an | long | 0.5 | u
+ladybug | ladybugs | a | long | 0.7 | u
+coffee bean | coffee beans | a | long | 1.2 | u
+jelly bean | jelly beans | a | long | 2 | u
+penny | pennies | a | across | 1.9 | u
+quarter | quarters | a | across | 2.43 | u
+sugar cube | sugar cubes | a | long | 1.6 | u
+die | dice | a | across | 1.6 | u
+grape | grapes | a | long | 2.2 | u
+almond | almonds | an | long | 2.3 | u
+paper clip | paper clips | a | long | 3.3 | u
+LEGO brick | LEGO bricks | a | long | 3.2 | u
+golf ball | golf balls | a | across | 4.3 | u
+ping pong ball | ping pong balls | a | across | 4 | u
+AA battery | AA batteries | an | long | 5 | u
+matchstick | matchsticks | a | long | 5 | u
+chicken egg | chicken eggs | a | long | 5.7 | u
+toothpick | toothpicks | a | long | 6.5 | u
+baseball | baseballs | a | across | 7.4 | u
+hockey puck | hockey pucks | a | across | 7.6 | u
+credit card | credit cards | a | long | 8.6 | u
+playing card | playing cards | a | long | 8.9 | u
+crayon | crayons | a | long | 9 | u
+donut | donuts | a | across | 9 | u
+bagel | bagels | a | across | 10 | u
+coffee mug | coffee mugs | a | tall | 10 | u
+soda can | soda cans | a | tall | 12.2 | u
+smartphone | smartphones | a | long | 15 | u
+dollar bill | dollar bills | a | long | 15.6 | u
+fork | forks | a | long | 19 | u
+toothbrush | toothbrushes | a | long | 19 | u
+pencil | pencils | a | long | 19 | u
+banana | bananas | a | long | 18 | u
+brick | bricks | a | long | 20 | u
+water bottle | water bottles | a | tall | 21 | u
+soccer ball | soccer balls | a | across | 22 | u
+chopstick | chopsticks | a | long | 24 | u
+basketball | basketballs | a | across | 24 | u
+milk jug | milk jugs | a | tall | 25 | u
+frisbee | frisbees | a | across | 27 | u
+sheet of paper | sheets of paper | a | long | 28 | u
+adult shoe | adult shoes | an | long | 28 | u
+football | footballs | a | long | 28 | u
+wine bottle | wine bottles | a | tall | 30 | u
+ruler | rulers | a | long | 30.5 | u
+large pizza | large pizzas | a | across | 36 | u
+bowling pin | bowling pins | a | tall | 38 | u
+house cat | house cats | a | long | 46 | u
+tennis racket | tennis rackets | a | long | 68 | u
+skateboard | skateboards | a | long | 79 | u
+baseball bat | baseball bats | a | long | 86 | u
+yardstick | yardsticks | a | long | 91.4 | u
+umbrella | umbrellas | an | long | 90 | u
+acoustic guitar | acoustic guitars | an | long | 102 | u
+golf club | golf clubs | a | long | 115 | u
+broom | brooms | a | long | 140 | u
+pool cue | pool cues | a | long | 147 | u
+bathtub | bathtubs | a | long | 152 | u
+hockey stick | hockey sticks | a | long | 160 | u
+bicycle | bicycles | a | long | 175 | u
+adult person | adult people | an | tall | 170 | u
+refrigerator | refrigerators | a | tall | 178 | u
+surfboard | surfboards | a | long | 200 | u
+front door | front doors | a | tall | 203 | u
+queen bed | queen beds | a | long | 203 | u
+canoe | canoes | a | long | 490 | u
+kayak | kayaks | a | long | 300 | u
+elephant | elephants | an | tall | 330 | u
+car | cars | a | long | 450 | u
+giraffe | giraffes | a | tall | 520 | u
+great white shark | great white sharks | a | long | 460 | u
+telephone pole | telephone poles | a | tall | 1200 | u
+school bus | school buses | a | long | 1220 | u
+T. rex | T. rexes | a | long | 1230 | u
+semi truck | semi trucks | a | long | 2200 | u
+tennis court | tennis courts | a | long | 2377 | u
+blue whale | blue whales | a | long | 2500 | u
+basketball court | basketball courts | a | long | 2865 | u
+bowling lane | bowling lanes | a | long | 1830 |
+Olympic swimming pool | Olympic swimming pools | an | long | 5000 | u
+jumbo jet | jumbo jets | a | long | 7070 | u
+football field | football fields | a | long | 10970 | u
+Statue of Liberty | Statues of Liberty | the | tall | 9300 | u
+Big Ben clock tower | Big Ben clock towers | the | tall | 9600 |
+London Eye | London Eyes | the | tall | 13500 |
+Great Pyramid of Giza | Great Pyramids | the | tall | 13800 |
+Washington Monument | Washington Monuments | the | tall | 16900 |
+Space Needle | Space Needles | the | tall | 18400 |
+Gateway Arch | Gateway Arches | the | tall | 19200 |
+Titanic | Titanics | the | long | 26900 |
+Eiffel Tower | Eiffel Towers | the | tall | 33000 | u
+Empire State Building | Empire State Buildings | the | tall | 44300 | u
+Taipei 101 tower | Taipei 101 towers | the | tall | 50800 |
+CN Tower | CN Towers | the | tall | 55300 |
+Burj Khalifa | Burj Khalifas | the | tall | 82800 |
+Golden Gate Bridge | Golden Gate Bridges | the | long | 273700 |
+Mount Everest | Mount Everests | | tall | 884900 |
+marathon | marathons | a | long | 4219500 |
+Leaning Tower of Pisa | Leaning Towers of Pisa | the | tall | 5600 |
+Christ the Redeemer statue | Christ the Redeemer statues | the | tall | 3000 |
+Mona Lisa | Mona Lisas | the | tall | 77 |
+Hollywood sign letter | Hollywood sign letters | a | tall | 1370 |
+International Space Station | International Space Stations | the | across | 10900 |
+garden hose | garden hoses | a | long | 1524 |
+ladder | ladders | a | tall | 183 | u
+sheet of plywood | sheets of plywood | a | long | 244 |
+two-by-four | two-by-fours | a | long | 244 | u
+ironing board | ironing boards | an | long | 137 |
+mattress | mattresses | a | long | 203 |
+sofa | sofas | a | long | 213 | u
+piano keyboard | piano keyboards | a | long | 122 |
+pickup truck | pickup trucks | a | long | 580 | u
+city bus | city buses | a | long | 1220 |
+subway car | subway cars | a | long | 1830 |
+train boxcar | train boxcars | a | long | 1550 |
+shipping container | shipping containers | a | long | 1219 | u
+basketball hoop | basketball hoops | a | tall | 305 |
+soccer goal | soccer goals | a | across | 732 |
+ostrich | ostriches | an | tall | 230 |
+emperor penguin | emperor penguins | an | tall | 115 |
+polar bear | polar bears | a | long | 250 |
+alligator | alligators | an | long | 400 |
+anaconda | anacondas | an | long | 500 |
+chicken | chickens | a | tall | 40 |
+hamster | hamsters | a | long | 12 | u
+goldfish | goldfish | a | long | 6 | u
+honeybee | honeybees | a | long | 1.3 | u
+hummingbird | hummingbirds | a | long | 8 | u
+redwood tree | redwood trees | a | tall | 9100 |
+Christmas tree | Christmas trees | a | tall | 210 |
+pumpkin | pumpkins | a | across | 30 |
+watermelon | watermelons | a | long | 38 |
+pineapple | pineapples | a | tall | 30 |
+carrot | carrots | a | long | 18 | u
+hot dog | hot dogs | a | long | 15 | u
+taco | tacos | a | across | 15 |
+loaf of bread | loaves of bread | a | long | 30 |
+baguette | baguettes | a | long | 65 | u
+spaghetti noodle | spaghetti noodles | a | long | 25 | u
+crayon box | crayon boxes | a | long | 13 |
+paperback book | paperback books | a | tall | 18 | u
+laptop | laptops | a | across | 33 |
+TV (55-inch) | 55-inch TVs | a | across | 122 |
+stop sign | stop signs | a | across | 76 |
+traffic cone | traffic cones | a | tall | 71 |
+fire hydrant | fire hydrants | a | tall | 75 |
+mailbox | mailboxes | a | tall | 110 |
+parking space | parking spaces | a | long | 550 |
+lane of highway | highway lanes | a | across | 366 |
