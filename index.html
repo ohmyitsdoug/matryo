@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Matryo</title>
-<meta name="description" content="A daily word game: name as many things as you can, each one a little smaller than the last.">
+<title>Halfway · Matryo</title>
+<meta name="description" content="A daily word game: name the thing halfway between a big thing and a small thing.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap">
 <script>
@@ -97,6 +97,21 @@ button[disabled]{opacity:.45;cursor:not-allowed}
 .sqr.end{background:var(--ink);color:var(--bg);border:2px solid var(--ink)}
 .sqr.on{border:2px solid var(--ink);background:var(--card);color:var(--ink);box-shadow:2px 2px 0 var(--ink)}
 .sqr.hi{box-shadow:3px 3px 0 var(--acc)}
+.sqr.cur{border:2px solid var(--ink);color:var(--ink)} .sqr.cur span{opacity:1}
+.sqr.on{font-size:12px;font-variant-numeric:tabular-nums}
+.sqr.on.bull{background:var(--acc);color:var(--acc-ink)}
+.sqr.on.miss{color:var(--mut);box-shadow:none}
+.scale{display:flex;flex-direction:column;gap:8px;padding:30px 0 4px}
+.track{position:relative;height:12px;border:2px solid var(--ink);background:var(--card)}
+.track .tick{position:absolute;top:-10px;bottom:-10px;width:3px;margin-left:-1.5px;background:var(--acc)}
+.pin{position:absolute;top:-34px;transform:translateX(-50%);white-space:nowrap}
+.pin span{display:inline-block;border:2px solid var(--ink);background:var(--bg);padding:1px 7px;font-size:13px;font-weight:700;box-shadow:2px 2px 0 var(--acc)}
+.pin::after{content:"";position:absolute;left:50%;top:100%;width:2px;height:12px;margin-left:-1px;background:var(--ink)}
+.scale-ends{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.prow.round{align-items:flex-start}
+.prow .t .rare{color:var(--acc-text);font-weight:700}
+.reveal .score{font-size:48px}
+.note .rare{color:var(--acc-text);font-weight:700}
 .sqlabels{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
 .ends{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:700;font-size:22px;letter-spacing:-.5px}
 .ends .mid{font-size:12px;font-weight:500;color:var(--mut);letter-spacing:0;text-align:center}
@@ -222,24 +237,20 @@ button[disabled]{opacity:.45;cursor:not-allowed}
 <script src="config.js" onerror="void 0"></script>
 <script>
 // =====================================================================
-// Matryo v0.2 — mind the gap: name 7 things that fit between a big word and a small word
-// Data: data/words.json (word, exact size, commonness…), data/dailies.json (start + end word for each day)
+// Matryo v0.3 — Halfway: 7 quick rounds, name the thing halfway between a big word and a small word
+// Data: data/words.json (word, exact size, commonness…), data/dailies.json (7 rounds of big + small words per day)
 // Server: Netlify functions + Netlify Blobs storage (netlify/functions); the game still works without them
 // =====================================================================
 const CFG=Object.assign({api:'/.netlify/functions'},window.MATRYO_CONFIG||{});
 const API=CFG.api;   // Netlify server functions: logging, shared stats, words added after launch
-const VERSION='0.2';
-const DAILY_SECONDS=60, HEADSTART_MS=1500, MAX_PAUSES=2;
-// v0.2 "mind the gap": a big word and a small word about 8 sizes apart (1 size = 1.5x).
-// Name 7 things that fit between them, in any order. Lenient on purpose:
-//   a word counts if it's clearly between the two (EDGE) and at least half a size (SPACING) from your other words,
-//   so there are about 14 half-size spots and you need any 7.
-const SLOTS=7, EDGE=0.3, SPACING=0.5;
-// each word scores up to 100: placed 50 + specific 5 per level (max 15) + rare up to 20 + next down 10
-// round bonuses: all 7 = +100, one in every size = +50, finishing early = +2 per second left
-const PLACE_PTS=50, SPEC_PTS=5, SPEC_MAX=15, NEXT_PTS=10, MAX_PTS=100, FULL_PTS=100, EVEN_PTS=50, TIME_PTS=2;
+const VERSION='0.3';
+// v0.3 "Halfway": 7 quick rounds a day. Each round shows a big word and a small word about 3 sizes apart
+// (1 size = 1.5x). In 20 seconds, name the thing closest to the exact middle.
+//   closeness: within BULL of the middle = 100, falling to 10 at the edge of the gap; outside the gap doesn't count
+//   specific words count as closer: each level more specific than the everyday word = SPEC_CREDIT sizes nearer
+const ROUNDS=7, ROUND_SECONDS=20, HEADSTART_MS=1000, MAX_PAUSES=2;
+const EDGE=0.15, BULL=0.15, SPEC_CREDIT=0.15, SPEC_MAX=0.45, MIN_PTS=10, MAX_PTS=100;
 const COOLDOWN_DAYS=7, MIN_PLAYS_FOR_STATS=25;
-const rarePts=r=>r>=2?20:r>=1.6?15:r>=1.3?10:r>=1.1?5:0;
 const SITE='https://playsmidgen.com/?utm_source=matryo&utm_medium=game&utm_campaign=footer';
 const app=document.getElementById('app');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -267,21 +278,22 @@ function applySettings(){document.documentElement.classList.toggle('calm',!SET.m
 applySettings();
 const reduced=()=>!SET.motion||matchMedia('(prefers-reduced-motion: reduce)').matches;
 function toggleTheme(){const t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;store.set('theme',t)}
-const saved=n=>store.get('v02:'+n,null);          // finished dailies (v0.2 rules)
+const saved=n=>store.get('v03:'+n,null);          // finished dailies (v0.3 Halfway)
 const liveSaved=n=>store.get('live:'+n,null);     // a daily that was paused or left mid-round
-function clearResults(){try{Object.keys(localStorage).filter(k=>/^snug:(best|result|r8|v01|v02|recent|live|badges)/.test(k)).forEach(k=>localStorage.removeItem(k))}catch(_){}}
+function clearResults(){try{Object.keys(localStorage).filter(k=>/^snug:(best|result|r8|v01|v02|v03|recent|live|badges)/.test(k)).forEach(k=>localStorage.removeItem(k))}catch(_){}}
 // anonymous id for this device, so admin stats can count unique visitors without accounts
 const DEVICE=(()=>{let d=store.get('device',null);if(!d){d=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now());store.set('device',d)}return d})();
 const todayISO=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 
 // ---------- data ----------
-let ALIAS={},RANK=()=>50,EX={},TIER={},ALTS={},POP={},PARENT={},SPECD={},SQUASH={},KEYS=[],DAILIES=[],TODAY=null,MIN_EX=1;
+let NICE=new Set(),ALIAS={},RANK=()=>50,EX={},TIER={},ALTS={},POP={},PARENT={},SPECD={},SQUASH={},KEYS=[],DAILIES=[],TODAY=null,MIN_EX=1;
 function addWord(w,x,p,spec,parent,alts){
   EX[w]=x;TIER[w]=Math.round(x);POP[w]=p;if(parent){PARENT[w]=parent;SPECD[w]=spec||1}if(alts&&alts.length)ALTS[w]=alts;
   SQUASH[w.replace(/_/g,'')]=w;
 }
 async function loadData(){
-  const [w,d]=await Promise.all(['words','dailies'].map(f=>fetch(`data/${f}.json`).then(r=>r.json())));
+  const [w,d,c]=await Promise.all(['words','dailies','categories'].map(f=>fetch(`data/${f}.json`).then(r=>r.json())));
+  NICE=new Set(c.flatMap(x=>x.words));   // hand-picked everyday things, used for the "near the middle" examples
   for(const r of w.words)addWord(r[0],r[1],r[2],r[3],r[4],r[5]);
   ALIAS=w.aliases||{};   // other everyday names: MED KIT -> FIRST AID KIT
   // words added after launch: by you in admin.html, or automatically once enough players type the same word in a day
@@ -332,42 +344,39 @@ function norm(raw){
 }
 
 // ---------- scoring ----------
-// where a word lands between the two ends; null = not allowed, with a reason
-function place(w,r,placed){
+const mid=q=>(q.big+q.small)/2;
+// where a word sits in this round's gap; null size = not allowed, with a reason
+function judge(w,q,noSpec=false){
   const sizes=[EX[w],...(ALTS[w]||[])];
-  const inside=sizes.filter(s=>s<r.big-EDGE&&s>r.small+EDGE);
+  const inside=sizes.filter(s=>s<q.big-EDGE&&s>q.small+EDGE);
   if(!inside.length){
-    if(sizes.every(s=>s>=r.big-EDGE))return{no:sizes.some(s=>s<r.big+EDGE)?'asbig':'big'};
-    if(sizes.every(s=>s<=r.small+EDGE))return{no:sizes.some(s=>s>r.small-EDGE)?'assmall':'small'};
+    if(sizes.every(s=>s>=q.big-EDGE))return{no:sizes.some(s=>s<q.big+EDGE)?'asbig':'big'};
+    if(sizes.every(s=>s<=q.small+EDGE))return{no:sizes.some(s=>s>q.small-EDGE)?'assmall':'small'};
     return{no:'big'};
   }
-  const free=inside.filter(s=>placed.every(p=>Math.abs(p.size-s)>=SPACING));
-  if(!free.length){const near=placed.find(p=>Math.abs(p.size-inside[0])<SPACING);return{no:'close',near:near&&near.w}}
-  return{size:free[0]};
+  const m=mid(q),size=inside.sort((a,b)=>Math.abs(a-m)-Math.abs(b-m))[0];
+  const raw=Math.abs(size-m),credit=noSpec?0:Math.min(SPEC_MAX,SPEC_CREDIT*specificity(w));
+  const d=Math.max(0,raw-credit),half=(q.big-q.small)/2;
+  const p=d<=BULL?MAX_PTS:Math.max(MIN_PTS,Math.round((MAX_PTS-(d-BULL)/(half-BULL)*(MAX_PTS-MIN_PTS))/5)*5);
+  return{size,raw,credit,d,p};
 }
-const band=(x,r)=>Math.min(SLOTS-1,Math.max(0,Math.floor((r.big-EDGE-x)/((r.big-r.small-2*EDGE)/SLOTS))));
+const mark=p=>p>=90?'🎯':p>=60?'🟧':p>=30?'🟨':'⬜';
 const hasStats=()=>STATS&&STATS_N>=MIN_PLAYS_FOR_STATS;
-// rare: uncommon in everyday English now; once a daily has 25+ rounds, uncommon among players
-function rarity(w){
-  if(hasStats()){const pc=STATS[w]||0;return pc<=2?2:pc<=5?1.6:pc<=10?1.3:pc<=20?1.1:1}
-  return Math.min(2,Math.max(.6,Math.round((2.2-POP[w]*.3)*10)/10));
-}
-// the % shown next to every word: share of players once there are enough, otherwise how common it is in English
+// how common a word is: share of players once there are enough, otherwise everyday-English frequency
 function pctLabel(w){
   if(hasStats())return`said by ${STATS[w]||0}% of players`;
   const r=RANK(w);return r>=50?`rarer than ${r}% of words`:`top ${Math.max(1,r)}% most common`;
 }
-function cooldown(w){ // played in the last 7 days: worth half, recovering a little each day
-  const last=store.get('recent',{})[w];if(!last)return 1;
-  const days=Math.round((new Date(todayISO())-new Date(last))/864e5);
-  return days>=COOLDOWN_DAYS?1:Math.round((.5+.5*days/COOLDOWN_DAYS)*10)/10;
+// the everyday words closest to the middle (for the reveal)
+function middleWords(q,skip,n=3){
+  const m=mid(q);
+  const near=KEYS.filter(w=>!PARENT[w]&&!ALTS[w]&&!skip.has(w)&&Math.abs(EX[w]-m)<=0.45);
+  const by=(a,b)=>Math.abs(EX[a]-m)-Math.abs(EX[b]-m);
+  // hand-picked everyday things first, then very common words
+  return[...near.filter(w=>NICE.has(w)).sort(by),...near.filter(w=>!NICE.has(w)&&POP[w]>=4.2).sort(by)].slice(0,n);
 }
 function remember(words){const r=store.get('recent',{}),t=todayISO();words.forEach(w=>r[w]=t);
   for(const k in r)if((new Date(t)-new Date(r[k]))/864e5>COOLDOWN_DAYS)delete r[k];store.set('recent',r)}
-function roundBonus(placed,r,secsLeft){
-  const full=placed.length>=SLOTS, even=new Set(placed.map(p=>band(p.size,r))).size>=SLOTS;
-  return{full:full?FULL_PTS:0,even:even?EVEN_PTS:0,time:full?Math.round(secsLeft)*TIME_PTS:0};
-}
 
 // ---------- backend (optional): logging and shared stats ----------
 function log(kind,payload){
@@ -381,26 +390,19 @@ async function loadStats(n){
 }
 
 // ---------- puzzles ----------
-function puzzleFor(d){return{...d,big:EX[d.start]??d.start_size,small:EX[d.end]??d.end_size}}
-const pairLabel=d=>`${W(d.start)} → ${W(d.end)}`;
-let QUICK=null;   // a paused quick round (kept in memory only)
+function puzzleFor(d){return{...d,qs:d.rounds.map(x=>({...x,big:EX[x.big]??30,small:EX[x.small]??27,bigW:x.big,smallW:x.small}))}}
+let QUICK=null;   // a paused quick game (kept in memory only)
 function quick(){
   const pool=DAILIES.filter(d=>d.n!==TODAY.n);const d=pool[Math.floor(Math.random()*pool.length)];
-  leave({...puzzleFor(d),n:0,quick:true,secs:DAILY_SECONDS,date:TODAY.date});
-}
-// common everyday words for a size you left empty (most played once there's data)
-function suggestions(r,k,used,n=3){
-  const pool=KEYS.filter(w=>!PARENT[w]&&!used.has(w)&&EX[w]<r.big-EDGE&&EX[w]>r.small+EDGE&&band(EX[w],r)===k&&!ALTS[w]);
-  pool.sort((a,b)=>hasStats()?((STATS[b]||0)-(STATS[a]||0))||(POP[b]-POP[a]):POP[b]-POP[a]);
-  return pool.slice(0,n);
+  leave({...puzzleFor(d),n:0,quick:true,date:TODAY.date});
 }
 
 // ---------- badges and history (dailies only) ----------
 const BADGES=[
   {id:'first',name:'First steps',how:'Finish your first daily'},
-  {id:'full',name:'Full house',how:'Fill all 7 in a daily'},
-  {id:'even',name:'Even steps',how:'One thing in every size'},
-  {id:'speedy',name:'Quick fit',how:'Fill all 7 with 20+ seconds left'},
+  {id:'bull',name:'Bullseye',how:'Score 100 on a round'},
+  {id:'triple',name:'Dead center',how:'3 bullseyes in one daily'},
+  {id:'sharp',name:'Sharp eye',how:'Every round 60 or more'},
   {id:'deep',name:'Deep cut',how:'A word 2 steps more specific than its everyday name'},
   {id:'streak7',name:'Week streak',how:'Play 7 dailies in a row'},
 ];
@@ -412,20 +414,20 @@ function streak(){ // days in a row with a played daily, counting back from toda
   while(played.has(iso(day))){n++;day.setDate(day.getDate()-1)}return n;
 }
 function awardBadges(res){
-  const have=store.get('badges',{}),got=[];
+  const have=store.get('badges',{}),got=[],ps=res.answers.map(a=>a.p||0);
   const earn=(id,ok)=>{if(ok&&!have[id]){have[id]=todayISO();got.push(id)}};
   earn('first',true);
-  earn('full',res.placed.length>=SLOTS);
-  earn('even',res.bonus.even>0);
-  earn('speedy',res.placed.length>=SLOTS&&res.left>=20);
-  earn('deep',res.placed.some(x=>specificity(x.w)>=2));
+  earn('bull',ps.some(p=>p>=100));
+  earn('triple',ps.filter(p=>p>=100).length>=3);
+  earn('sharp',ps.length===ROUNDS&&ps.every(p=>p>=60));
+  earn('deep',res.answers.some(a=>a.w&&specificity(a.w)>=2));
   earn('streak7',streak()>=7);
   store.set('badges',have);return got;
 }
 
 // ---------- shared pieces ----------
 const nav=(right='')=>`<header class="nav in" style="--d:0">
-  <button class="logo" id="home" aria-label="Matryo home"><span class="m" aria-hidden="true">M</span>matryo</button>
+  <button class="logo" id="home" aria-label="Home"><span class="m" aria-hidden="true">M</span>matryo</button>
   <div class="r">${right}<button class="sq" id="menu">Menu</button><button class="sq icon" id="theme" aria-label="Switch light or dark mode">${ICON.sun}${ICON.moon}</button></div>
 </header>`;
 const footer=(d=12)=>`<div class="foot footer in" style="--d:${d}">© 2026 · Powered by <a href="${SITE}" target="_blank" rel="noopener">Smidgen Games</a> · v${VERSION} beta</div>`;
@@ -437,13 +439,15 @@ const statBoxes=()=>{const sc=history().map(x=>x.res.total);return`
   <div class="stat"><b class="num">${streak()}</b><span>day streak</span></div>
   <div class="stat"><b class="num">${sc.length?fmt(Math.max(...sc)):'–'}</b><span>best</span></div>
   <div class="stat"><b class="num">${Object.keys(store.get('badges',{})).length}/${BADGES.length}</b><span>badges</span></div>`};
-// nine equal squares: the two ends (arrows pointing in) and the 7 to fill, in size order
-function squares(placed,hi){
-  const sorted=[...(placed||[])].sort((a,b)=>b.size-a.size);
+// 7 squares, one per round, with the two arrow ends pointing in
+function squares(answers,cur){
   let h=`<span class="sqr end" aria-hidden="true">${ICON.right}</span>`;
-  for(let i=0;i<SLOTS;i++){const p=sorted[i];h+=p?`<span class="sqr on ${p.w===hi?'hi':''}" title="${esc(W(p.w))}">${ICON.check}</span>`:'<span class="sqr"><span>?</span></span>'}
-  return`<div class="sqrow" role="img" aria-label="${sorted.length} of ${SLOTS} filled">${h}<span class="sqr end" aria-hidden="true">${ICON.left}</span></div>`;
+  for(let i=0;i<ROUNDS;i++){const a=(answers||[])[i];
+    h+=a?`<span class="sqr on ${a.p>=90?'bull':a.p>=60?'good':a.p>=30?'ok':'miss'}" title="Round ${i+1}: ${a.p||0}">${a.p||0}</span>`
+      :`<span class="sqr ${i===cur?'cur':''}"><span>${i===cur?i+1:'?'}</span></span>`}
+  return`<div class="sqrow" role="img" aria-label="${(answers||[]).length} of ${ROUNDS} rounds played">${h}<span class="sqr end" aria-hidden="true">${ICON.left}</span></div>`;
 }
+const pairLabel=d=>d.rounds?`${d.rounds.length} rounds`:'';
 
 // ---------- home ----------
 let S=null,tick=null;
@@ -453,7 +457,7 @@ function showStart(){
   const p=puzzleFor(TODAY);
   const pausesLeft=live?MAX_PAUSES-live.pauses:MAX_PAUSES;
   const play=res?`<span>See today's results</span><span aria-hidden="true">→</span>`
-    :live?`<span>Resume the daily <small>· ${clock(Math.ceil(live.left/1000))} left</small></span><span aria-hidden="true">→</span>`
+    :live?`<span>Resume the daily <small>· round ${Math.min(ROUNDS,live.answers.length+1)} of ${ROUNDS}</small></span><span aria-hidden="true">→</span>`
     :`<span>Play the daily</span><span aria-hidden="true">→</span>`;
   app.innerHTML=`${nav()}
   <div class="page home">
@@ -462,11 +466,11 @@ function showStart(){
     <div class="main-col">
       <div class="daily in" style="--d:3">
         <span class="tag">Daily #${pad3(TODAY.n)} · ${fmtDate(TODAY.date)}</span>
-        <h1>Mind the gap</h1>
-        <p class="lead">One big thing. One small thing.<br>Fill the 7 sizes in between.</p>
-        <div style="width:100%;margin-top:4px">${squares(live?live.placed:res?res.placed:[])}
-          <div class="sqlabels"><span>big</span><span>7 in between</span><span>small</span></div></div>
-        <div class="fine">60 seconds. Everyday things, no names. Words revealed when you start. <a href="#how" class="howlink" id="how">How scoring works</a></div>
+        <h1>Halfway</h1>
+        <p class="lead">Two things, one big, one small.<br>Name what's halfway between.</p>
+        <div style="width:100%;margin-top:4px">${squares(live?live.answers:res?res.answers:[])}
+          <div class="sqlabels"><span>big</span><span>7 rounds · 20 seconds each</span><span>small</span></div></div>
+        <div class="fine">Everyday things, no names. The closer to the middle, the more it scores. <a href="#how" class="howlink" id="how">How scoring works</a></div>
       </div>
       <div class="cta in" style="--d:4">
         <button class="btn main" id="daily">${play}</button>
@@ -486,30 +490,24 @@ function showStart(){
 function showHelp(){
   app.innerHTML=`${nav()}<div class="narrow help in" style="--d:1;display:flex;flex-direction:column;gap:12px">
     <div class="head"><h2>How it works</h2><button class="sq" id="back">Back</button></div>
-    <p>When the round starts you see a big thing and a small thing, like <b>bathtub</b> and <b>garlic</b>. Name 7 things that are smaller than the big one and bigger than the small one, in any order, in 60 seconds.</p>
-    <p class="note">Each one has to be a different size from your others: about half a size apart (one size is about 1.5×). Too close to one you already have and it won't count, but it costs nothing. Something about as big as either end doesn't count either.</p>
-    <h3>EACH WORD SCORES UP TO 100</h3>
-    <table class="pt"><thead><tr><th>Part</th><th>Points</th></tr></thead><tbody>
-      <tr><td>Fits in the gap</td><td>50</td></tr>
-      <tr><td>Specific · cup → coffee cup → demitasse, per level</td><td>+5, up to +15</td></tr>
-      <tr><td>Rare · fewer people say it</td><td>up to +20</td></tr>
-      <tr><td>Next down · smaller than the word you named before it</td><td>+10</td></tr>
-    </tbody></table>
-    <h3>ROUND BONUSES</h3>
+    <p>Each round shows two things, like <b>chair</b> and <b>plate</b>. You have 20 seconds to name something that's as close as you can get to halfway between their sizes. Seven rounds a day.</p>
+    <p class="note">Halfway means "as many times smaller than the big one as it is bigger than the small one." Sizes are measured on the longest side.</p>
+    <h3>POINTS EACH ROUND</h3>
     <table class="pt"><tbody>
-      <tr><td>All 7 filled</td><td>+100</td></tr>
-      <tr><td>Even steps · one thing in every size between the ends</td><td>+50</td></tr>
-      <tr><td>Finished early · per second left</td><td>+2</td></tr>
+      <tr><td>Right in the middle</td><td>100</td></tr>
+      <tr><td>Further from the middle</td><td>fewer, down to 10 at the edges</td></tr>
+      <tr><td>Bigger than the big one or smaller than the small one</td><td>doesn't count: try again</td></tr>
     </tbody></table>
-    <p class="note">Every word shows how rare it is: at first by how common the word is in English, then by how many players said it. A word you played in the last 7 days scores half, recovering over the week.</p>
+    <h3>SPECIFIC IS CLOSER</h3>
+    <p>A more specific name counts as closer to the middle than its everyday word: cup → coffee cup → demitasse. Each level is worth a little extra closeness.</p>
     <h3>PAUSING</h3>
     <p>Tap pause to step away. You can pause a daily twice; pausing a third time ends it.</p>
     <h3>WHAT COUNTS</h3>
     <ul>
       <li>Everyday names for real things. No proper names (no brands, cities or people).</li>
-      <li>Very specific names might not be in the list yet. If one isn't recognized, try the everyday name. We add new words every day from what players type.</li>
+      <li>If a word isn't recognized, try the everyday name. We add new words every day from what players type.</li>
       <li>Made-up combos count as their main word: giant cup counts as cup. Real products like mini fridge count as themselves.</li>
-      <li>Words with more than one meaning work at any of their sizes: a wing can be a bird's wing or a hospital wing.</li>
+      <li>Words with more than one meaning count at whichever size is closest to the middle.</li>
     </ul>
   </div>${footer(2)}`;
   wireNav();document.getElementById('back').onclick=showStart;window.scrollTo(0,0);
@@ -559,125 +557,146 @@ function showMenu(){
   window.scrollTo(0,0);
 }
 
-// ---------- round ----------
+// ---------- rounds ----------
 function leave(r,resume){
   // open the keyboard now, inside the tap, so phones allow it; the real input takes focus once the round screen exists
   document.getElementById('keep').focus();
   const els=[...app.querySelectorAll('.in')].filter(el=>!el.parentElement.closest('.in'));
   els.forEach((el,i)=>{el.classList.remove('in');el.style.setProperty('--d',Math.min(i,8));el.classList.add('out')});
-  setTimeout(()=>startRound(r,resume),reduced()?0:250+Math.min(els.length,8)*35);
+  setTimeout(()=>startGame(r,resume),reduced()?0:250+Math.min(els.length,8)*35);
 }
-function saveLive(){ // dailies only: what's needed to resume, and to stop a reload from restarting the clock
+function saveLive(){ // dailies only: what's needed to resume, and to stop a reload from restarting a round
   if(!S||S.r.quick)return;
   const left=S.clock?Math.max(0,S.end-Date.now()):S.left;
-  store.set('live:'+S.r.n,{placed:S.placed,score:S.score,used:[...S.used],left,pauses:S.pauses,running:S.live,last:S.last});
+  store.set('live:'+S.r.n,{answers:S.answers,score:S.score,i:S.i,left,pauses:S.pauses,phase:S.phase,running:S.live,used:[...S.used]});
 }
-function startRound(r,resume){
-  const secs=r.secs||DAILY_SECONDS;
+function startGame(r,resume){
   if(r.quick)QUICK=null;
-  S={r,secs,placed:[],used:new Set([r.start,r.end]),score:0,end:0,left:secs*1000,pauses:0,live:false,clock:false,last:null,
-     ...(resume?{placed:resume.placed,score:resume.score,used:new Set(resume.used),left:resume.left,pauses:resume.pauses,last:resume.last}:{})};
+  S={r,i:0,answers:[],score:0,left:ROUND_SECONDS*1000,pauses:0,phase:'play',live:false,clock:false,end:0,used:new Set(),
+     ...(resume?{answers:resume.answers,score:resume.score,i:resume.i,left:resume.left,pauses:resume.pauses,phase:resume.phase,used:new Set(resume.used||[])}:{})};
   if(!r.quick)loadStats(r.n);
+  S.phase==='reveal'?showReveal():showQuestion();
+}
+function showQuestion(){
+  const q=S.r.qs[S.i];S.phase='play';S.clock=false;S.live=false;
   app.innerHTML=`<div class="page play">
     <div class="main-col" style="display:flex;flex-direction:column;gap:10px">
       <div class="playtop in" style="--d:0">
         <button class="sq icon" id="pause" aria-label="Pause">${ICON.pause}</button>
-        <span class="timer num" id="t">${clock(Math.ceil(S.left/1000))}</span>
-        <div class="bar" id="bar"><div style="width:${100*S.left/(secs*1000)}%"></div></div>
-        <span class="tag pts num" id="sc"></span>
+        <span class="timer num" id="t">0:${String(Math.ceil(S.left/1000)).padStart(2,'0')}</span>
+        <div class="bar" id="bar"><div style="width:${100*S.left/(ROUND_SECONDS*1000)}%"></div></div>
+        <span class="tag pts num">${S.i+1}/${ROUNDS} · ${fmt(S.score)}</span>
       </div>
-      <div class="ends in" style="--d:1"><span>${esc(W(r.start))}</span><span class="mid" id="pl"></span><span>${esc(W(r.end))}</span></div>
-      <div class="in" id="sqs" style="--d:1"></div>
-      <div class="chips in" id="chips" style="--d:2"></div>
+      <div class="in" style="--d:1">${squares(S.answers,S.i)}</div>
+      <div class="eyebrow in" style="--d:1;text-align:center;margin-top:4px">What's halfway between</div>
+      <div class="ends in" style="--d:1"><span>${esc(W(q.bigW))}</span><span class="mid">and</span><span>${esc(W(q.smallW))}</span></div>
       <form id="f" class="in" style="--d:2" autocomplete="off">
         <label for="g" class="field"><span class="mut">›</span><span class="mirror" id="m"></span><span class="caret"></span>
-          <input id="g" aria-label="Something between ${esc(W(r.start))} and ${esc(W(r.end))}" autocapitalize="off" autocorrect="on" spellcheck="true" enterkeyhint="go" maxlength="32"></label>
+          <input id="g" aria-label="Something halfway between ${esc(W(q.bigW))} and ${esc(W(q.smallW))}" autocapitalize="off" autocorrect="on" spellcheck="true" enterkeyhint="go" maxlength="32"></label>
       </form>
       <div class="fb" id="fb" aria-live="polite"></div>
     </div>
-    <aside class="side-col"><div class="side"><div class="eyebrow" style="margin-bottom:8px">Biggest to smallest</div><div class="path" id="side"></div></div></aside>
   </div>`;
   const g=document.getElementById('g');
-  // the clock starts at the first keystroke, or a moment after GO, whichever comes first
+  // the clock starts at the first keystroke, or a moment after the round appears
   g.oninput=()=>{document.getElementById('m').textContent=g.value;if(S&&!S.clock)startClock()};
   g.onfocus=()=>{if(!matchMedia('(min-width:900px)').matches){window.scrollTo(0,0);setTimeout(()=>window.scrollTo(0,0),300)}};
-  document.getElementById('f').onsubmit=e=>{e.preventDefault();if(!S)return;if(!S.clock)startClock();submit(g.value);g.value='';g.oninput();g.focus()};
+  document.getElementById('f').onsubmit=e=>{e.preventDefault();if(!S)return;if(!S.clock)startClock();submit(g.value);if(S&&S.phase==='play'){g.value='';g.oninput();g.focus()}};
   document.getElementById('pause').onclick=pause;
-  drawPlay();g.focus();
+  g.focus();
   const fb=document.getElementById('fb');
-  const beats=reduced()?[['Go!',0]]:[['Ready',120],['Set',650],['Go!',1200]];
-  beats.forEach(([word,at])=>setTimeout(()=>{if(S&&!S.clock){fb.className='fb pop';fb.innerHTML=`<span class="count">${word}</span>`}},at));
-  setTimeout(()=>{if(S&&!S.clock)startClock()},beats[beats.length-1][1]+HEADSTART_MS);
-  if(!r.quick)saveLive();
+  if(!reduced()){fb.className='fb pop';fb.innerHTML=`<span class="count">Round ${S.i+1}</span>`}
+  setTimeout(()=>{if(S&&S.phase==='play'&&!S.clock)startClock()},HEADSTART_MS);
+  saveLive();
 }
 function startClock(){
-  if(!S||S.clock)return;
+  if(!S||S.clock||S.phase!=='play')return;
   S.clock=true;S.live=true;S.end=Date.now()+S.left;
   const fb=document.getElementById('fb');if(fb&&fb.querySelector('.count'))fb.innerHTML='';
   let n=0;
   tick=setInterval(()=>{
-    if(!S)return clearInterval(tick);
+    if(!S||S.phase!=='play')return clearInterval(tick);
     const left=Math.max(0,S.end-Date.now()),s=Math.ceil(left/1000);
-    document.getElementById('t').textContent=clock(s);
+    document.getElementById('t').textContent=`0:${String(s).padStart(2,'0')}`;
     const bar=document.getElementById('bar');
-    bar.firstElementChild.style.width=(left/(S.secs*10))+'%';
-    bar.classList.toggle('low',s<=10);
+    bar.firstElementChild.style.width=(left/(ROUND_SECONDS*10))+'%';
+    bar.classList.toggle('low',s<=5);
     if(++n%10===0)saveLive();
-    if(!left)finish('time');
+    if(!left)endRound(null);
   },100);
 }
 function pause(){
   if(!S)return;
-  if(S.r.quick){ // quick play: pause as often as you like, kept until you leave the page
-    S.left=S.clock?Math.max(0,S.end-Date.now()):S.left;clearInterval(tick);
-    QUICK={r:S.r,placed:S.placed,score:S.score,used:[...S.used],left:S.left,pauses:0,last:S.last};S=null;showStart();return;
+  const playing=S.phase==='play';
+  if(playing){S.left=S.clock?Math.max(0,S.end-Date.now()):S.left;clearInterval(tick)}
+  if(S.r.quick){QUICK={r:S.r,answers:S.answers,score:S.score,i:S.i,left:S.left,pauses:0,phase:S.phase,used:[...S.used]};S=null;showStart();return}
+  if(playing){
+    if(S.pauses>=MAX_PAUSES){
+      const b=document.getElementById('pause');
+      if(!b.dataset.armed){b.dataset.armed='1';S.end=Date.now()+S.left;say('no','Pausing again ends your daily. Tap pause once more to end it.');setTimeout(()=>{if(b)delete b.dataset.armed},4000);return}
+      return finish('paused');
+    }
+    S.pauses++;
   }
-  if(S.pauses>=MAX_PAUSES){
-    const b=document.getElementById('pause');
-    if(!b.dataset.armed){b.dataset.armed='1';say('no','Pausing again ends your daily. Tap pause once more to end it.');setTimeout(()=>{delete b.dataset.armed},4000);return}
-    return finish('paused');
-  }
-  S.left=S.clock?Math.max(0,S.end-Date.now()):S.left;clearInterval(tick);
-  S.pauses++;S.clock=false;S.live=false;saveLive();S=null;showStart();
+  S.clock=false;S.live=false;saveLive();S=null;showStart();
 }
-function drawPlay(){
-  const sorted=[...S.placed].sort((a,b)=>b.size-a.size);
-  document.getElementById('sqs').innerHTML=squares(S.placed,S.last);
-  document.getElementById('chips').innerHTML=sorted.map(x=>`<span class="${x.w===S.last?'hi':''}">${esc(W(x.w))}</span>`).join('');
-  document.getElementById('sc').textContent=`${S.placed.length}/${SLOTS} · ${fmt(S.score)}`;
-  const left=MAX_PAUSES-S.pauses;
-  document.getElementById('pl').textContent=S.r.quick?'7 in between':left>0?`7 in between · ${left} pause${left===1?'':'s'}`:'7 in between';
-  document.getElementById('side').innerHTML=`<div class="prow endrow"><span class="w">${esc(W(S.r.start))}</span><span class="mut">big</span></div>`+
-    sorted.map(x=>`<div class="prow"><span class="w">${esc(W(x.w))}</span><span class="num">+${x.p}</span></div>`).join('')+
-    `<div class="prow endrow"><span class="w">${esc(W(S.r.end))}</span><span class="mut">small</span></div>`;
-}
-function say(kind,msg,detail){
+function say(kind,msg){
   const fb=document.getElementById('fb');if(!fb)return;
-  fb.className='fb pop '+(kind==='no'?'no':'ok');
-  fb.innerHTML=kind==='no'?`<span>✕ ${esc(msg)}</span>`:`<b class="num">${esc(msg)}</b><span>${detail}</span>`;
+  fb.className='fb pop no';fb.innerHTML=`<span>✕ ${esc(msg)}</span>`;
 }
 function submit(raw){
-  if(!raw.trim()||!S||!S.live)return;
-  const hit=norm(raw),r=S.r,typed=raw.trim();
-  if(!hit){log('miss',{word:typed.toLowerCase().slice(0,40),puzzle:r.n||null,lo:r.small,hi:r.big,device:DEVICE});return say('no',`"${typed}" isn't in our list yet. Try an everyday name.`)}
+  if(!raw.trim()||!S||!S.live||S.phase!=='play')return;
+  const q=S.r.qs[S.i],hit=norm(raw),typed=raw.trim();
+  if(!hit){log('miss',{word:typed.toLowerCase().slice(0,40),puzzle:S.r.n||null,lo:q.small,hi:q.big,device:DEVICE});return say('no',`"${typed}" isn't in our list yet. Try an everyday name.`)}
   const w=hit.w,note=hit.from?`${typed} → ${W(w)}. `:'';
-  if(S.used.has(w))return say('no',note+(w===r.start||w===r.end?`${W(w)} is one of the ends.`:`${W(w)} is already in.`));
-  const f=place(w,r,S.placed);
-  const big=W(r.start).toLowerCase(),small=W(r.end).toLowerCase();
-  if(f.no==='big')return say('no',note+`${W(w)} is bigger than ${big}.`);
-  if(f.no==='asbig')return say('no',note+`${W(w)} is about as big as ${big}. Go a little smaller.`);
-  if(f.no==='small')return say('no',note+`${W(w)} is smaller than ${small}.`);
-  if(f.no==='assmall')return say('no',note+`${W(w)} is about as small as ${small}. Go a little bigger.`);
-  if(f.no==='close')return say('no',note+`${W(w)} is too close in size to ${W(f.near||'one you have').toLowerCase()}. Try a size you don't have yet.`);
-  const prev=S.placed[S.placed.length-1];
-  const m={rare:rarity(w),spec:hit.from==='phrase'?0:Math.min(SPEC_MAX,SPEC_PTS*specificity(w)),next:prev&&f.size<prev.size?NEXT_PTS:0,cool:cooldown(w)};
-  const p=Math.max(5,Math.min(MAX_PTS,Math.round((PLACE_PTS+m.spec+rarePts(m.rare)+m.next)*m.cool/5)*5));
-  S.score+=p;S.placed.push({w,p,size:f.size,...m});S.used.add(w);S.last=w;
-  const tags=[m.spec&&'specific',m.next&&'next down',m.cool<1&&'played recently'].filter(Boolean).map(esc);
-  tags.push(`<span class="${m.rare>=1.3?'rare':''}">${esc(pctLabel(w))}</span>`);
-  say('ok',`+${p}`,esc(note+W(w))+' · '+tags.join(' · '));
-  drawPlay();saveLive();
-  if(S.placed.length>=SLOTS){S.live=false;clearInterval(tick);S.left=Math.max(0,S.end-Date.now());setTimeout(()=>finish('full'),900)}
+  if(w===q.bigW||w===q.smallW)return say('no',`${W(w)} is one of the two. Name something in between.`);
+  if(S.used.has(w))return say('no',note+`You already used ${W(w).toLowerCase()} today.`);
+  const j=judge(w,q,hit.from==='phrase'),big=W(q.bigW).toLowerCase(),small=W(q.smallW).toLowerCase();
+  if(j.no==='big')return say('no',note+`${W(w)} is bigger than ${big}.`);
+  if(j.no==='asbig')return say('no',note+`${W(w)} is about as big as ${big}. Go smaller.`);
+  if(j.no==='small')return say('no',note+`${W(w)} is smaller than ${small}.`);
+  if(j.no==='assmall')return say('no',note+`${W(w)} is about as small as ${small}. Go bigger.`);
+  endRound({w,typed,...j});
+}
+function endRound(a){
+  clearInterval(tick);
+  const q=S.r.qs[S.i];
+  const ans=a||{w:null,p:0};
+  S.answers[S.i]=ans;S.score+=ans.p||0;if(ans.w)S.used.add(ans.w);
+  S.phase='reveal';S.clock=false;S.live=false;S.left=ROUND_SECONDS*1000;
+  saveLive();showReveal();
+}
+// the round's answer on a scale from the big thing (left) to the small thing (right)
+function scale(q,a,mids){
+  const pos=x=>Math.max(0,Math.min(100,(q.big-x)/(q.big-q.small)*100));
+  const you=a&&a.w?`<div class="pin you" style="left:${pos(a.size).toFixed(1)}%"><span>${esc(W(a.w))}</span></div>`:'';
+  return`<div class="scale">
+    <div class="track"><span class="tick" style="left:50%"></span>${you}</div>
+    <div class="scale-ends"><b>${esc(W(q.bigW))}</b><span class="mut">${mids[0]?`middle ≈ ${esc(W(mids[0]).toLowerCase())}`:'middle'}</span><b>${esc(W(q.smallW))}</b></div>
+  </div>`;
+}
+function showReveal(){
+  const q=S.r.qs[S.i],a=S.answers[S.i],last=S.i>=ROUNDS-1;
+  const mids=middleWords(q,new Set([q.bigW,q.smallW]));
+  const side=a&&a.w?(a.d<=BULL?'Right in the middle!':`A bit ${a.size>mid(q)?'bigger':'smaller'} than the middle${a.raw>0.8?' (quite a bit)':''}.`):'Out of time.';
+  app.innerHTML=`<div class="page play reveal">
+    <div class="main-col" style="display:flex;flex-direction:column;gap:14px">
+      <div class="playtop in" style="--d:0"><button class="sq icon" id="pause" aria-label="Pause">${ICON.pause}</button><span class="timer">Round ${S.i+1}</span><span class="tag pts num">${S.i+1}/${ROUNDS} · ${fmt(S.score)}</span></div>
+      <div class="in" style="--d:1">${squares(S.answers)}</div>
+      <div class="in" style="--d:1;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><b class="score num">+${a.p||0}</b><span>${esc(side)}</span></div>
+      <div class="in" style="--d:2">${scale(q,a,mids)}</div>
+      ${a&&a.w?`<div class="note in" style="--d:2">${esc(W(a.w))} · <span class="${RANK(a.w)>=70?'rare':''}">${esc(pctLabel(a.w))}</span>${a.credit?` · specific: counts ${a.credit.toFixed(2).replace(/0$/,'')} sizes closer`:''}</div>`:''}
+      ${mids.length?`<div class="note in" style="--d:3">Near the middle: ${mids.map(w=>esc(W(w).toLowerCase())).join(', ')}</div>`:''}
+      <button class="btn main in" style="--d:3" id="next"><span>${last?'See results':'Next round'}</span><span aria-hidden="true">→</span></button>
+    </div>
+  </div>`;
+  document.getElementById('pause').onclick=pause;
+  document.getElementById('next').onclick=()=>{
+    if(last)return finish('done');
+    document.getElementById('keep').focus();   // keeps the phone keyboard up for the next round
+    S.i++;showQuestion();
+  };
+  window.scrollTo(0,0);
 }
 
 // ---------- results ----------
@@ -686,16 +705,16 @@ function finish(why){
   if(!S)return;
   const R=S;S=null;
   document.activeElement&&document.activeElement.blur();
-  const r=R.r,secsLeft=why==='full'?Math.floor((R.left||0)/1000):0;
-  const bonus=roundBonus(R.placed,r,secsLeft);
-  const total=R.score+bonus.full+bonus.even+bonus.time;
-  const res={why,secs:R.secs,placed:R.placed,used:[...R.used],words:R.score,bonus,total,left:secsLeft,pauses:R.pauses};
-  remember(R.placed.map(x=>x.w));
+  const r=R.r;
+  while(R.answers.length<ROUNDS)R.answers.push({w:null,p:0});
+  const total=R.answers.reduce((t,a)=>t+(a.p||0),0);
+  const res={why,answers:R.answers,total,pauses:R.pauses};
+  remember(R.answers.filter(a=>a.w).map(a=>a.w));
   if(!r.quick){
     store.del('live:'+r.n);
-    store.set('v02:'+r.n,res);
-    res.badges=awardBadges(res);if(res.badges.length)store.set('v02:'+r.n,res);
-    log('play',{puzzle:r.n,words:R.placed.map(x=>x.w),score:total,reached:R.placed.length>=SLOTS,steps:R.placed.length,device:DEVICE});
+    store.set('v03:'+r.n,res);
+    res.badges=awardBadges(res);if(res.badges.length)store.set('v03:'+r.n,res);
+    log('play',{puzzle:r.n,words:R.answers.filter(a=>a.w).map(a=>a.w),score:total,reached:R.answers.every(a=>(a.p||0)>=90),steps:R.answers.filter(a=>a.w).length,device:DEVICE});
   }else QUICK=null;
   showResults(r,res);
 }
@@ -704,38 +723,27 @@ function untilMidnight(){const n=new Date(),m=new Date(n);m.setHours(24,0,0,0);c
 async function showResults(r,res){
   clearInterval(tick);
   if(!r.quick&&STATS_FOR!==r.n){await loadStats(r.n);STATS_FOR=r.n}
-  const placed=[...res.placed].sort((a,b)=>b.size-a.size),used=new Set(res.used);
-  const n=placed.length,covered=new Set(placed.map(p=>band(p.size,r)));
-  const title=r.quick?'Matryo quick play':`Matryo #${pad3(r.n)}`;
-  const strip=[...Array(SLOTS).keys()].map(k=>covered.has(k)?'🟧':'⬜').join('');
-  const shareTxt=`${title} · ${n}/${SLOTS} · ${fmt(res.total)} pts\n➡️${strip}⬅️\nmatryo.io`;
-  const ended={time:"Time's up",full:'All 7 filled!',paused:'Ended by pausing'}[res.why]||"Time's up";
-  // top to bottom, biggest to smallest: your words, plus the sizes you left empty with common answers
-  const span=(r.big-r.small-2*EDGE)/SLOTS;
-  const rows=placed.map(x=>({size:x.size,x}));
-  for(let k=0;k<SLOTS;k++)if(!covered.has(k)){const s=suggestions(r,k,used);if(s.length)rows.push({size:r.big-EDGE-span*(k+.5),gap:s})}
-  rows.sort((a,b)=>b.size-a.size);
-  const tags=x=>[x.spec&&'specific',x.next&&'next down',x.cool<1&&'played recently'].filter(Boolean).join(' · ');
-  const bonusRows=[[res.bonus.full,'All 7 filled'],[res.bonus.even,'Even steps · one in every size'],[res.bonus.time,`Finished early · ${res.left}s left`]].filter(b=>b[0]);
+  const title=r.quick?'Halfway quick play':`Halfway #${pad3(r.n)}`;
+  const marks=res.answers.map(a=>mark(a.p||0)).join('');
+  const shareTxt=`${title} · ${fmt(res.total)}/${ROUNDS*MAX_PTS}\n${marks}\nmatryo.io`;
+  const bulls=res.answers.filter(a=>(a.p||0)>=100).length;
   app.innerHTML=`${nav()}<div class="narrow" style="max-width:560px">
     <div class="sumrow in" style="--d:1">
-      <div style="display:flex;flex-direction:column;gap:4px"><span class="note">${r.quick?'Quick play':`Daily #${pad3(r.n)}`} · ${esc(pairLabel(r))}</span>
-        <b class="score num">${n} of ${SLOTS}</b><span style="font-size:14px">${fmt(res.total)} points · ${esc(ended)}</span></div>
-      <div class="r">${r.quick?'':`<span>${streak()} day streak</span>`}<span>${covered.size} of ${SLOTS} sizes</span></div>
+      <div style="display:flex;flex-direction:column;gap:4px"><span class="note">${r.quick?'Quick play':`Daily #${pad3(r.n)}`}${res.why==='paused'?' · ended by pausing':''}</span>
+        <b class="score num">${fmt(res.total)}</b><span style="font-size:14px">out of ${ROUNDS*MAX_PTS} · ${marks}</span></div>
+      <div class="r">${r.quick?'':`<span>${streak()} day streak</span>`}<span>${bulls} bullseye${bulls===1?'':'s'}</span></div>
     </div>
     ${(res.badges||[]).length?`<div class="badge-new in" style="--d:2"><b>New badge${res.badges.length>1?'s':''} · ${res.badges.map(id=>BADGES.find(x=>x.id===id).name).join(', ')}</b><span>${res.badges.map(id=>BADGES.find(x=>x.id===id).how).join(' · ')}</span></div>`:''}
-    <div class="in" style="--d:2"><div class="eyebrow" style="margin-bottom:4px">Biggest to smallest</div>
-      <div class="path">
-        <div class="prow endrow"><span class="w">${esc(W(r.start))}</span><span class="mut">start</span></div>
-        ${rows.map(o=>o.x?`<div class="prow"><span class="w">${esc(W(o.x.w))}${tags(o.x)?` <span class="t">· ${esc(tags(o.x))}</span>`:''}<br><span class="pct ${o.x.rare>=1.3?'rare':''}">${esc(pctLabel(o.x.w))}</span></span><span class="num">+${o.x.p}</span></div>`
-          :`<div class="prow gap"><span class="w">No word at this size <span class="t">· e.g. ${o.gap.map(w=>esc(W(w).toLowerCase())).join(', ')}</span></span><span></span></div>`).join('')}
-        <div class="prow endrow"><span class="w">${esc(W(r.end))}</span><span class="mut">end</span></div>
-        ${bonusRows.map(([v,l])=>`<div class="prow bonus"><span class="w">${esc(l)}</span><span class="num">+${v}</span></div>`).join('')}
+    <div class="in" style="--d:2"><div class="eyebrow" style="margin-bottom:4px">Your rounds</div>
+      <div class="path">${r.qs.map((q,i)=>{const a=res.answers[i]||{},mids=middleWords(q,new Set([q.bigW,q.smallW]),1);
+        return`<div class="prow round"><span class="i num">${i+1}</span><span class="w"><b>${esc(W(q.bigW))} → ${esc(W(q.smallW))}</b><br>
+          <span class="t">${a.w?`you: ${esc(W(a.w).toLowerCase())} · <span class="${RANK(a.w)>=70?'rare':''}">${esc(pctLabel(a.w))}</span>`:'no answer'}${mids[0]?` · middle: ${esc(W(mids[0]).toLowerCase())}`:''}</span></span>
+          <span class="num">${mark(a.p||0)} ${a.p||0}</span></div>`}).join('')}
       </div></div>
     <div class="share in" style="--d:4" id="sh"><span class="eyebrow">Share preview</span>\n${esc(shareTxt)}</div>
     <button class="btn main in" style="--d:5" id="cp"><span id="cpl">Share results</span>${ICON.copy}</button>
     <div class="two in" style="--d:6"><button class="btn" id="again">Quick play</button><button class="btn" id="homeb">Home</button></div>
-    <div class="foot in" style="--d:7">${r.quick?'':`Next daily in <span class="num" id="cd">${untilMidnight()}</span> · `}© 2026 · <a href="${SITE}" target="_blank" rel="noopener">Smidgen Games</a></div>
+    <div class="foot in" style="--d:7">${r.quick?'':`Next daily in <span class="num" id="cd">${untilMidnight()}</span> · `}🎯 90+ · 🟧 60+ · 🟨 30+ · ⬜ under 30 · © 2026 · <a href="${SITE}" target="_blank" rel="noopener">Smidgen Games</a></div>
   </div>`;
   window.scrollTo(0,0);wireNav();
   tick=setInterval(()=>{const cd=document.getElementById('cd');if(cd)cd.textContent=untilMidnight();else clearInterval(tick)},1000);
@@ -754,11 +762,11 @@ app.innerHTML='<div class="note" style="padding:40px 0">Loading…</div>';
 loadData().then(()=>{
   // a daily left mid-round (tab closed or reloaded) counts as a pause
   const live=liveSaved(TODAY.n);
-  if(live&&!Array.isArray(live.placed))store.del('live:'+TODAY.n);   // an unfinished v0.1 round
+  if(live&&!Array.isArray(live.answers))store.del('live:'+TODAY.n);   // an unfinished round from an older version
   else if(live&&live.running){live.running=false;live.pauses++;store.set('live:'+TODAY.n,live)}
   const l2=liveSaved(TODAY.n);
   if(l2&&l2.pauses>MAX_PAUSES&&!saved(TODAY.n)){
-    S={r:puzzleFor(TODAY),secs:DAILY_SECONDS,placed:l2.placed,used:new Set(l2.used),score:l2.score,pauses:MAX_PAUSES,left:0};
+    S={r:puzzleFor(TODAY),answers:l2.answers,score:l2.score,pauses:MAX_PAUSES,used:new Set()};
     return finish('paused');
   }
   showStart();log('visit',{device:DEVICE});

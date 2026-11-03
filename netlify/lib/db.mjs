@@ -70,7 +70,7 @@ export async function aggregate(store, back = 14) {
     const pct = Object.fromEntries(Object.entries(counts).map(([w, c]) => [w, Math.round((100 * c) / plays.length)]));
     const scores = plays.map((p) => p.score || 0);
     const s = {
-      puzzle: d.n, date: d.date, cat: d.cat || `${String(d.start).replace(/_/g, ' ')} → ${String(d.end).replace(/_/g, ' ')}`, plays: plays.length,
+      puzzle: d.n, date: d.date, cat: d.cat || (d.rounds ? d.rounds.map((r) => `${r.big} → ${r.small}`.replace(/_/g, ' ')).join(' · ') : `${d.start} → ${d.end}`), plays: plays.length,
       players: new Set(plays.map((p) => p.device || p.key)).size,
       returning: new Set(plays.filter((p) => p.returning).map((p) => p.device)).size,
       avg_score: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,

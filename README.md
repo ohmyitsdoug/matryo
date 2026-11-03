@@ -17,33 +17,20 @@ tools/              scripts and source files for words, categories and the sched
 review/             spreadsheet of every word for you to check
 ```
 
-## Rules (what players see) · v0.2 beta
-1. Each daily is a big word and a small word about 8 sizes apart (one size = 1.5×), revealed when the round starts. Example: BATHTUB → GARLIC.
-2. In 60 seconds, name 7 things that fit between them, in any order. Everyday things, no proper nouns.
-3. Lenient on purpose: a word counts if it's clearly between the ends and at least half a size from your other words. There are about 14 half-size spots and you need any 7. The round ends early once all 7 are in.
+## Rules (what players see) · v0.3 beta "Halfway"
+1. Seven quick rounds a day. Each round shows a big thing and a small thing about 3 sizes apart (one size = 1.5×), e.g. CHAIR and PLATE.
+2. You have 20 seconds to name the thing closest to halfway between their sizes ("as many times smaller than the big one as it is bigger than the small one").
+3. After each round you see where your word landed on a scale, the everyday words nearest the middle, and your points. Tap Next for the next round.
 4. Pause from the top-left: two pauses per daily, a third ends it. Closing or reloading mid-round counts as a pause.
 
-Results list everything biggest to smallest, with each word's % (how common in English until a daily has 25+ rounds, then the share of players who said it). Sizes you skipped show common answers.
-
 ## Scoring
-| Per word (max 100) | Points |
-| --- | --- |
-| Fits in the gap | 50 |
-| Specific: +5 per level below the everyday word | up to +15 |
-| Rare | +5 / +10 / +15 / +20 |
-| Next down: smaller than the word you named before it | +10 |
-| Played in the last 7 days | half, recovering over the week |
-
-| Round bonus | Points |
-| --- | --- |
-| All 7 filled | +100 |
-| Even steps: one word in each of the 7 sizes between the ends | +50 |
-| Finished early | +2 per second left |
-
-Ranking is by total points, so filling all 7 matters most and rare, specific words decide between full ladders.
+- Within 0.15 sizes of the middle = 100. Further away scores less, down to 10 at the edges. Bigger than the big thing or smaller than the small one doesn't count (try again while the clock runs).
+- Specific is closer: each level more specific than the everyday word counts 0.15 sizes nearer the middle (up to 0.45), so DEMITASSE beats CUP at the same size.
+- A day is out of 700. Share marks: 🎯 90+ · 🟧 60+ · 🟨 30+ · ⬜ under 30.
+- Each word shows its % (how common in English until a daily has 25+ rounds, then the share of players who said it). A word can only be used once per day.
 
 ## Daily schedule
-`tools/make_pairs.py 2026-11-03 365` builds `data/dailies.json`: well-known words (from the place lists in `tools/categories.txt` plus very common words) paired about 8 sizes apart, only where every size in between has at least 5 everyday words. A word comes back as an end at most every 40 days, and no pair repeats. Words that make confusing ends (BAT, CHIP, MATCH…) are listed in `tools/pair_avoid.txt`; add to it and rerun to swap any you don't like.
+`tools/make_halfway.py 2026-11-03 365` builds `data/dailies.json`: 7 rounds a day, one from each scale band (small things to big things, in a random order). Ends are everyday objects from the place lists plus very common words, 2.8–3.2 sizes apart, with at least 6 everyday words near the middle. An end word doesn't come back within 14 days and a pair not within 90. Confusing words (BAT, CHIP, MATCH…) go in `tools/pair_avoid.txt`; add to it and rerun. (`tools/make_pairs.py` is the v0.2 "fill the gap" schedule, kept for reference.)
 
 ## Going live (about 15 minutes, Netlify only)
 
