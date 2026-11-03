@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Halfway · Matryo</title>
-<meta name="description" content="A daily word game: name the thing halfway between a big thing and a small thing.">
+<title>Snug</title>
+<meta name="description" content="A daily word game: what's the biggest thing that still fits in a suitcase? Through a door? In your pocket?">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap">
 <script>
@@ -112,6 +112,18 @@ button[disabled]{opacity:.45;cursor:not-allowed}
 .prow .t .rare{color:var(--acc-text);font-weight:700}
 .reveal .score{font-size:48px}
 .note .rare{color:var(--acc-text);font-weight:700}
+.sqrow.seven{justify-content:flex-start;gap:6px}
+.sqrow.seven .sqr{max-width:56px}
+.ask{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;margin:4px 0}
+.ask b{font-size:30px;line-height:1.05;letter-spacing:-1px}
+.nest{display:flex;justify-content:center}
+.outer{position:relative;width:min(240px,70vw);aspect-ratio:1;border:3px solid var(--ink);background:var(--card);display:flex;align-items:flex-end;justify-content:flex-start;padding:6px;box-sizing:border-box}
+.olab{position:absolute;top:-24px;left:0;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--mut)}
+.inner{background:var(--acc);color:var(--acc-ink);border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;overflow:visible;min-width:14px;min-height:14px;box-sizing:border-box;transition:width .5s cubic-bezier(.2,.8,.2,1),height .5s cubic-bezier(.2,.8,.2,1)}
+.inner{position:relative}
+.inner span{font-size:13px;font-weight:700;white-space:nowrap;padding:0 4px}
+.inner.tiny span{position:absolute;left:calc(100% + 6px);bottom:0;color:var(--ink);padding:0}
+.nest{padding-top:22px}
 .sqlabels{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
 .ends{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:700;font-size:22px;letter-spacing:-.5px}
 .ends .mid{font-size:12px;font-weight:500;color:var(--mut);letter-spacing:0;text-align:center}
@@ -219,6 +231,8 @@ button[disabled]{opacity:.45;cursor:not-allowed}
   .footer{border-top:2px solid var(--ink);margin:0 -32px;padding:18px 32px;text-align:left}
   .page.play{align-items:flex-start}
   .play .ends{font-size:56px;letter-spacing:-2px}
+  .play .ask b{font-size:56px;letter-spacing:-2px}
+  .outer{width:320px}
   .play .ends .mid{font-size:15px}
   .play .sqr{max-width:64px}
   .home .sqr{max-width:56px}
@@ -237,19 +251,20 @@ button[disabled]{opacity:.45;cursor:not-allowed}
 <script src="config.js" onerror="void 0"></script>
 <script>
 // =====================================================================
-// Matryo v0.3 — Halfway: 7 quick rounds, name the thing halfway between a big word and a small word
-// Data: data/words.json (word, exact size, commonness…), data/dailies.json (7 rounds of big + small words per day)
+// Snug v0.4 — 7 quick rounds: name the biggest thing that still fits in a suitcase, through a door…
+// Data: data/words.json (word, exact size, commonness…), data/dailies.json (7 rounds a day) + data/fits.json (the spaces)
 // Server: Netlify functions + Netlify Blobs storage (netlify/functions); the game still works without them
 // =====================================================================
 const CFG=Object.assign({api:'/.netlify/functions'},window.MATRYO_CONFIG||{});
 const API=CFG.api;   // Netlify server functions: logging, shared stats, words added after launch
-const VERSION='0.3';
-// v0.3 "Halfway": 7 quick rounds a day. Each round shows a big word and a small word about 3 sizes apart
-// (1 size = 1.5x). In 20 seconds, name the thing closest to the exact middle.
-//   closeness: within BULL of the middle = 100, falling to 10 at the edge of the gap; outside the gap doesn't count
-//   specific words count as closer: each level more specific than the everyday word = SPEC_CREDIT sizes nearer
+const VERSION='0.4';
+// v0.4 "Snug": 7 quick rounds a day. Each round names a real space ("in a suitcase", "through a door").
+// In 20 seconds, name the biggest thing that still fits. Sizes are the longest side, on a scale where 1 size = 1.5x.
+//   a snug fit (within about 10% of the space, either way) = 100, falling to 10 for something 3+ sizes smaller
+//   clearly bigger than the space doesn't fit: try again while the clock runs
+//   specific words count as a snugger fit: each level more specific than the everyday word = SPEC_CREDIT sizes
 const ROUNDS=7, ROUND_SECONDS=20, HEADSTART_MS=1000, MAX_PAUSES=2;
-const EDGE=0.15, BULL=0.15, SPEC_CREDIT=0.15, SPEC_MAX=0.45, MIN_PTS=10, MAX_PTS=100;
+const NEAR=0.26, FALL=3, SPEC_CREDIT=0.15, SPEC_MAX=0.45, MIN_PTS=10, MAX_PTS=100;
 const COOLDOWN_DAYS=7, MIN_PLAYS_FOR_STATS=25;
 const SITE='https://playsmidgen.com/?utm_source=matryo&utm_medium=game&utm_campaign=footer';
 const app=document.getElementById('app');
@@ -278,21 +293,22 @@ function applySettings(){document.documentElement.classList.toggle('calm',!SET.m
 applySettings();
 const reduced=()=>!SET.motion||matchMedia('(prefers-reduced-motion: reduce)').matches;
 function toggleTheme(){const t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;store.set('theme',t)}
-const saved=n=>store.get('v03:'+n,null);          // finished dailies (v0.3 Halfway)
+const saved=n=>store.get('v04:'+n,null);          // finished dailies (v0.4 Snug)
 const liveSaved=n=>store.get('live:'+n,null);     // a daily that was paused or left mid-round
-function clearResults(){try{Object.keys(localStorage).filter(k=>/^snug:(best|result|r8|v01|v02|v03|recent|live|badges)/.test(k)).forEach(k=>localStorage.removeItem(k))}catch(_){}}
+function clearResults(){try{Object.keys(localStorage).filter(k=>/^snug:(best|result|r8|v01|v02|v03|v04|recent|live|badges)/.test(k)).forEach(k=>localStorage.removeItem(k))}catch(_){}}
 // anonymous id for this device, so admin stats can count unique visitors without accounts
 const DEVICE=(()=>{let d=store.get('device',null);if(!d){d=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now());store.set('device',d)}return d})();
 const todayISO=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 
 // ---------- data ----------
-let NICE=new Set(),ALIAS={},RANK=()=>50,EX={},TIER={},ALTS={},POP={},PARENT={},SPECD={},SQUASH={},KEYS=[],DAILIES=[],TODAY=null,MIN_EX=1;
+let FITS=[],NICE=new Set(),ALIAS={},RANK=()=>50,EX={},TIER={},ALTS={},POP={},PARENT={},SPECD={},SQUASH={},KEYS=[],DAILIES=[],TODAY=null,MIN_EX=1;
 function addWord(w,x,p,spec,parent,alts){
   EX[w]=x;TIER[w]=Math.round(x);POP[w]=p;if(parent){PARENT[w]=parent;SPECD[w]=spec||1}if(alts&&alts.length)ALTS[w]=alts;
   SQUASH[w.replace(/_/g,'')]=w;
 }
 async function loadData(){
-  const [w,d,c]=await Promise.all(['words','dailies','categories'].map(f=>fetch(`data/${f}.json`).then(r=>r.json())));
+  const [w,d,c,fx]=await Promise.all(['words','dailies','categories','fits'].map(f=>fetch(`data/${f}.json`).then(r=>r.json())));
+  FITS=fx;
   NICE=new Set(c.flatMap(x=>x.words));   // hand-picked everyday things, used for the "near the middle" examples
   for(const r of w.words)addWord(r[0],r[1],r[2],r[3],r[4],r[5]);
   ALIAS=w.aliases||{};   // other everyday names: MED KIT -> FIRST AID KIT
@@ -344,35 +360,29 @@ function norm(raw){
 }
 
 // ---------- scoring ----------
-const mid=q=>(q.big+q.small)/2;
-// where a word sits in this round's gap; null size = not allowed, with a reason
+// how snugly a word fits this round's space; no = doesn't count, with a reason
 function judge(w,q,noSpec=false){
+  const head=ALIAS[q.head]||q.head;   // CUPBOARD is filed as CABINET
+  if(w===q.head||w===head||roots(w).includes(head)||roots(head).includes(w))return{no:'same'};
   const sizes=[EX[w],...(ALTS[w]||[])];
-  const inside=sizes.filter(s=>s<q.big-EDGE&&s>q.small+EDGE);
-  if(!inside.length){
-    if(sizes.every(s=>s>=q.big-EDGE))return{no:sizes.some(s=>s<q.big+EDGE)?'asbig':'big'};
-    if(sizes.every(s=>s<=q.small+EDGE))return{no:sizes.some(s=>s>q.small-EDGE)?'assmall':'small'};
-    return{no:'big'};
-  }
-  const m=mid(q),size=inside.sort((a,b)=>Math.abs(a-m)-Math.abs(b-m))[0];
-  const raw=Math.abs(size-m),credit=noSpec?0:Math.min(SPEC_MAX,SPEC_CREDIT*specificity(w));
-  const d=Math.max(0,raw-credit),half=(q.big-q.small)/2;
-  const p=d<=BULL?MAX_PTS:Math.max(MIN_PTS,Math.round((MAX_PTS-(d-BULL)/(half-BULL)*(MAX_PTS-MIN_PTS))/5)*5);
-  return{size,raw,credit,d,p};
+  const fits=sizes.filter(s=>s<=q.cap+NEAR).sort((a,b)=>b-a);   // the biggest size that still fits
+  if(!fits.length)return{no:'big'};
+  const size=fits[0],gap=Math.max(0,q.cap-size),credit=noSpec?0:Math.min(SPEC_MAX,SPEC_CREDIT*specificity(w));
+  const d=Math.max(0,gap-credit);
+  const p=d<=NEAR?MAX_PTS:Math.max(MIN_PTS,Math.round((MAX_PTS-(d-NEAR)/FALL*(MAX_PTS-MIN_PTS))/5)*5);
+  return{size,gap,credit,d,p};
 }
-const mark=p=>p>=90?'🎯':p>=60?'🟧':p>=30?'🟨':'⬜';
+const mark=p=>p>=100?'📦':p>=60?'🟧':p>=30?'🟨':'⬜';
 const hasStats=()=>STATS&&STATS_N>=MIN_PLAYS_FOR_STATS;
 // how common a word is: share of players once there are enough, otherwise everyday-English frequency
 function pctLabel(w){
   if(hasStats())return`said by ${STATS[w]||0}% of players`;
   const r=RANK(w);return r>=50?`rarer than ${r}% of words`:`top ${Math.max(1,r)}% most common`;
 }
-// the everyday words closest to the middle (for the reveal)
-function middleWords(q,skip,n=3){
-  const m=mid(q);
-  const near=KEYS.filter(w=>!PARENT[w]&&!ALTS[w]&&!skip.has(w)&&Math.abs(EX[w]-m)<=0.45);
-  const by=(a,b)=>Math.abs(EX[a]-m)-Math.abs(EX[b]-m);
-  // hand-picked everyday things first, then very common words
+// everyday things that fit snugly (for the reveal)
+function snugWords(q,skip,n=3){
+  const near=KEYS.filter(w=>!PARENT[w]&&!ALTS[w]&&!skip.has(w)&&w!==q.head&&EX[w]<=q.cap+NEAR&&EX[w]>=q.cap-0.9);
+  const by=(a,b)=>Math.abs(EX[a]-q.cap)-Math.abs(EX[b]-q.cap);
   return[...near.filter(w=>NICE.has(w)).sort(by),...near.filter(w=>!NICE.has(w)&&POP[w]>=4.2).sort(by)].slice(0,n);
 }
 function remember(words){const r=store.get('recent',{}),t=todayISO();words.forEach(w=>r[w]=t);
@@ -390,7 +400,7 @@ async function loadStats(n){
 }
 
 // ---------- puzzles ----------
-function puzzleFor(d){return{...d,qs:d.rounds.map(x=>({...x,big:EX[x.big]??30,small:EX[x.small]??27,bigW:x.big,smallW:x.small}))}}
+function puzzleFor(d){return{...d,qs:d.rounds.map(id=>{const f=FITS[id]||FITS[0];return{...f,cap:f.size}})}}
 let QUICK=null;   // a paused quick game (kept in memory only)
 function quick(){
   const pool=DAILIES.filter(d=>d.n!==TODAY.n);const d=pool[Math.floor(Math.random()*pool.length)];
@@ -400,8 +410,8 @@ function quick(){
 // ---------- badges and history (dailies only) ----------
 const BADGES=[
   {id:'first',name:'First steps',how:'Finish your first daily'},
-  {id:'bull',name:'Bullseye',how:'Score 100 on a round'},
-  {id:'triple',name:'Dead center',how:'3 bullseyes in one daily'},
+  {id:'bull',name:'Snug as a bug',how:'A perfect 100 fit'},
+  {id:'triple',name:'Packed',how:'3 perfect fits in one daily'},
   {id:'sharp',name:'Sharp eye',how:'Every round 60 or more'},
   {id:'deep',name:'Deep cut',how:'A word 2 steps more specific than its everyday name'},
   {id:'streak7',name:'Week streak',how:'Play 7 dailies in a row'},
@@ -427,7 +437,7 @@ function awardBadges(res){
 
 // ---------- shared pieces ----------
 const nav=(right='')=>`<header class="nav in" style="--d:0">
-  <button class="logo" id="home" aria-label="Home"><span class="m" aria-hidden="true">M</span>matryo</button>
+  <button class="logo" id="home" aria-label="Home"><span class="m" aria-hidden="true">S</span>snug</button>
   <div class="r">${right}<button class="sq" id="menu">Menu</button><button class="sq icon" id="theme" aria-label="Switch light or dark mode">${ICON.sun}${ICON.moon}</button></div>
 </header>`;
 const footer=(d=12)=>`<div class="foot footer in" style="--d:${d}">© 2026 · Powered by <a href="${SITE}" target="_blank" rel="noopener">Smidgen Games</a> · v${VERSION} beta</div>`;
@@ -441,11 +451,11 @@ const statBoxes=()=>{const sc=history().map(x=>x.res.total);return`
   <div class="stat"><b class="num">${Object.keys(store.get('badges',{})).length}/${BADGES.length}</b><span>badges</span></div>`};
 // 7 squares, one per round, with the two arrow ends pointing in
 function squares(answers,cur){
-  let h=`<span class="sqr end" aria-hidden="true">${ICON.right}</span>`;
+  let h='';
   for(let i=0;i<ROUNDS;i++){const a=(answers||[])[i];
-    h+=a?`<span class="sqr on ${a.p>=90?'bull':a.p>=60?'good':a.p>=30?'ok':'miss'}" title="Round ${i+1}: ${a.p||0}">${a.p||0}</span>`
+    h+=a?`<span class="sqr on ${a.p>=100?'bull':a.p>=60?'good':a.p>=30?'ok':'miss'}" title="Round ${i+1}: ${a.p||0}">${a.p||0}</span>`
       :`<span class="sqr ${i===cur?'cur':''}"><span>${i===cur?i+1:'?'}</span></span>`}
-  return`<div class="sqrow" role="img" aria-label="${(answers||[]).length} of ${ROUNDS} rounds played">${h}<span class="sqr end" aria-hidden="true">${ICON.left}</span></div>`;
+  return`<div class="sqrow seven" role="img" aria-label="${(answers||[]).length} of ${ROUNDS} rounds played">${h}</div>`;
 }
 const pairLabel=d=>d.rounds?`${d.rounds.length} rounds`:'';
 
@@ -466,11 +476,11 @@ function showStart(){
     <div class="main-col">
       <div class="daily in" style="--d:3">
         <span class="tag">Daily #${pad3(TODAY.n)} · ${fmtDate(TODAY.date)}</span>
-        <h1>Halfway</h1>
-        <p class="lead">Two things, one big, one small.<br>Name what's halfway between.</p>
+        <h1>How snug?</h1>
+        <p class="lead">What's the biggest thing that still fits in a suitcase? Through a door? In your pocket?</p>
         <div style="width:100%;margin-top:4px">${squares(live?live.answers:res?res.answers:[])}
-          <div class="sqlabels"><span>big</span><span>7 rounds · 20 seconds each</span><span>small</span></div></div>
-        <div class="fine">Everyday things, no names. The closer to the middle, the more it scores. <a href="#how" class="howlink" id="how">How scoring works</a></div>
+          <div class="sqlabels" style="justify-content:center"><span>7 rounds · 20 seconds each</span></div></div>
+        <div class="fine">Everyday things, no names. The snugger the fit, the more it scores. <a href="#how" class="howlink" id="how">How scoring works</a></div>
       </div>
       <div class="cta in" style="--d:4">
         <button class="btn main" id="daily">${play}</button>
@@ -490,16 +500,17 @@ function showStart(){
 function showHelp(){
   app.innerHTML=`${nav()}<div class="narrow help in" style="--d:1;display:flex;flex-direction:column;gap:12px">
     <div class="head"><h2>How it works</h2><button class="sq" id="back">Back</button></div>
-    <p>Each round shows two things, like <b>chair</b> and <b>plate</b>. You have 20 seconds to name something that's as close as you can get to halfway between their sizes. Seven rounds a day.</p>
-    <p class="note">Halfway means "as many times smaller than the big one as it is bigger than the small one." Sizes are measured on the longest side.</p>
+    <p>Each round names a space, like <b>in a suitcase</b> or <b>through a door</b>. You have 20 seconds to name the biggest thing that still fits. Seven rounds a day.</p>
+    <p class="note">Sizes are the longest side of an everyday version of the thing. A fit that's about the same size counts as snug, so close calls go your way.</p>
     <h3>POINTS EACH ROUND</h3>
     <table class="pt"><tbody>
-      <tr><td>Right in the middle</td><td>100</td></tr>
-      <tr><td>Further from the middle</td><td>fewer, down to 10 at the edges</td></tr>
-      <tr><td>Bigger than the big one or smaller than the small one</td><td>doesn't count: try again</td></tr>
+      <tr><td>A snug fit</td><td>100</td></tr>
+      <tr><td>Smaller, with room to spare</td><td>fewer, down to 10</td></tr>
+      <tr><td>Too big to fit</td><td>doesn't count: try again</td></tr>
+      <tr><td>The space itself, or a kind of it (a suitcase in a suitcase)</td><td>doesn't count</td></tr>
     </tbody></table>
-    <h3>SPECIFIC IS CLOSER</h3>
-    <p>A more specific name counts as closer to the middle than its everyday word: cup → coffee cup → demitasse. Each level is worth a little extra closeness.</p>
+    <h3>SPECIFIC IS SNUGGER</h3>
+    <p>A more specific name counts as a slightly snugger fit than its everyday word: cup → coffee cup → demitasse.</p>
     <h3>PAUSING</h3>
     <p>Tap pause to step away. You can pause a daily twice; pausing a third time ends it.</p>
     <h3>WHAT COUNTS</h3>
@@ -507,7 +518,8 @@ function showHelp(){
       <li>Everyday names for real things. No proper names (no brands, cities or people).</li>
       <li>If a word isn't recognized, try the everyday name. We add new words every day from what players type.</li>
       <li>Made-up combos count as their main word: giant cup counts as cup. Real products like mini fridge count as themselves.</li>
-      <li>Words with more than one meaning count at whichever size is closest to the middle.</li>
+      <li>Words with more than one meaning count at whichever size fits best.</li>
+      <li>Each word can be used once a day.</li>
     </ul>
   </div>${footer(2)}`;
   wireNav();document.getElementById('back').onclick=showStart;window.scrollTo(0,0);
@@ -588,11 +600,10 @@ function showQuestion(){
         <span class="tag pts num">${S.i+1}/${ROUNDS} · ${fmt(S.score)}</span>
       </div>
       <div class="in" style="--d:1">${squares(S.answers,S.i)}</div>
-      <div class="eyebrow in" style="--d:1;text-align:center;margin-top:4px">What's halfway between</div>
-      <div class="ends in" style="--d:1"><span>${esc(W(q.bigW))}</span><span class="mid">and</span><span>${esc(W(q.smallW))}</span></div>
+      <div class="ask in" style="--d:1"><span class="eyebrow">What's the biggest thing that still fits</span><b>${esc(q.phrase)}?</b></div>
       <form id="f" class="in" style="--d:2" autocomplete="off">
         <label for="g" class="field"><span class="mut">›</span><span class="mirror" id="m"></span><span class="caret"></span>
-          <input id="g" aria-label="Something halfway between ${esc(W(q.bigW))} and ${esc(W(q.smallW))}" autocapitalize="off" autocorrect="on" spellcheck="true" enterkeyhint="go" maxlength="32"></label>
+          <input id="g" aria-label="The biggest thing that still fits ${esc(q.phrase)}" autocapitalize="off" autocorrect="on" spellcheck="true" enterkeyhint="go" maxlength="32"></label>
       </form>
       <div class="fb" id="fb" aria-live="polite"></div>
     </div>
@@ -647,15 +658,12 @@ function say(kind,msg){
 function submit(raw){
   if(!raw.trim()||!S||!S.live||S.phase!=='play')return;
   const q=S.r.qs[S.i],hit=norm(raw),typed=raw.trim();
-  if(!hit){log('miss',{word:typed.toLowerCase().slice(0,40),puzzle:S.r.n||null,lo:q.small,hi:q.big,device:DEVICE});return say('no',`"${typed}" isn't in our list yet. Try an everyday name.`)}
+  if(!hit){log('miss',{word:typed.toLowerCase().slice(0,40),puzzle:S.r.n||null,lo:q.cap-2,hi:q.cap+NEAR,device:DEVICE});return say('no',`"${typed}" isn't in our list yet. Try an everyday name.`)}
   const w=hit.w,note=hit.from?`${typed} → ${W(w)}. `:'';
-  if(w===q.bigW||w===q.smallW)return say('no',`${W(w)} is one of the two. Name something in between.`);
   if(S.used.has(w))return say('no',note+`You already used ${W(w).toLowerCase()} today.`);
-  const j=judge(w,q,hit.from==='phrase'),big=W(q.bigW).toLowerCase(),small=W(q.smallW).toLowerCase();
-  if(j.no==='big')return say('no',note+`${W(w)} is bigger than ${big}.`);
-  if(j.no==='asbig')return say('no',note+`${W(w)} is about as big as ${big}. Go smaller.`);
-  if(j.no==='small')return say('no',note+`${W(w)} is smaller than ${small}.`);
-  if(j.no==='assmall')return say('no',note+`${W(w)} is about as small as ${small}. Go bigger.`);
+  const j=judge(w,q,hit.from==='phrase');
+  if(j.no==='same')return say('no',note+`That's the space itself. Name something that goes ${q.phrase.split(' ')[0]} it.`);
+  if(j.no==='big')return say('no',note+`${W(w)} won't fit ${q.phrase}. Go smaller.`);
   endRound({w,typed,...j});
 }
 function endRound(a){
@@ -666,27 +674,25 @@ function endRound(a){
   S.phase='reveal';S.clock=false;S.live=false;S.left=ROUND_SECONDS*1000;
   saveLive();showReveal();
 }
-// the round's answer on a scale from the big thing (left) to the small thing (right)
-function scale(q,a,mids){
-  const pos=x=>Math.max(0,Math.min(100,(q.big-x)/(q.big-q.small)*100));
-  const you=a&&a.w?`<div class="pin you" style="left:${pos(a.size).toFixed(1)}%"><span>${esc(W(a.w))}</span></div>`:'';
-  return`<div class="scale">
-    <div class="track"><span class="tick" style="left:50%"></span>${you}</div>
-    <div class="scale-ends"><b>${esc(W(q.bigW))}</b><span class="mut">${mids[0]?`middle ≈ ${esc(W(mids[0]).toLowerCase())}`:'middle'}</span><b>${esc(W(q.smallW))}</b></div>
-  </div>`;
+// box-in-a-box: the space as a square, your thing as a square scaled by length (same scale as the sizes)
+function nest(q,a){
+  const ratio=a&&a.w?Math.min(1.08,1.5**(a.size-q.cap)):0;
+  const pct=Math.max(7,Math.round(ratio*100));
+  return`<div class="nest"><div class="outer"><span class="olab">${esc(q.phrase.replace(/^(in|on|through) (a |an |your )?/,''))}</span>
+    ${a&&a.w?`<div class="inner ${pct<34?'tiny':''}" style="width:${Math.min(100,pct)}%;height:${Math.min(100,pct)}%"><span>${esc(W(a.w))}</span></div>`:''}</div></div>`;
 }
 function showReveal(){
   const q=S.r.qs[S.i],a=S.answers[S.i],last=S.i>=ROUNDS-1;
-  const mids=middleWords(q,new Set([q.bigW,q.smallW]));
-  const side=a&&a.w?(a.d<=BULL?'Right in the middle!':`A bit ${a.size>mid(q)?'bigger':'smaller'} than the middle${a.raw>0.8?' (quite a bit)':''}.`):'Out of time.';
+  const snug=snugWords(q,new Set([...S.used].filter(w=>!a||w!==a.w)));
+  const room=a&&a.w?(a.p>=MAX_PTS?(a.size>q.cap?'Snug! A tight squeeze, but it fits.':'Snug fit!'):a.gap<1?'Close: a little room to spare.':a.gap<2?'Fits, with room to spare.':'Fits, but it rattles around in there.'):'Out of time.';
   app.innerHTML=`<div class="page play reveal">
     <div class="main-col" style="display:flex;flex-direction:column;gap:14px">
       <div class="playtop in" style="--d:0"><button class="sq icon" id="pause" aria-label="Pause">${ICON.pause}</button><span class="timer">Round ${S.i+1}</span><span class="tag pts num">${S.i+1}/${ROUNDS} · ${fmt(S.score)}</span></div>
       <div class="in" style="--d:1">${squares(S.answers)}</div>
-      <div class="in" style="--d:1;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><b class="score num">+${a.p||0}</b><span>${esc(side)}</span></div>
-      <div class="in" style="--d:2">${scale(q,a,mids)}</div>
-      ${a&&a.w?`<div class="note in" style="--d:2">${esc(W(a.w))} · <span class="${RANK(a.w)>=70?'rare':''}">${esc(pctLabel(a.w))}</span>${a.credit?` · specific: counts ${a.credit.toFixed(2).replace(/0$/,'')} sizes closer`:''}</div>`:''}
-      ${mids.length?`<div class="note in" style="--d:3">Near the middle: ${mids.map(w=>esc(W(w).toLowerCase())).join(', ')}</div>`:''}
+      <div class="in" style="--d:1;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><b class="score num">+${a.p||0}</b><span>${esc(room)}</span></div>
+      <div class="in" style="--d:2">${nest(q,a)}</div>
+      ${a&&a.w?`<div class="note in" style="--d:2">${esc(W(a.w))} ${esc(q.phrase)} · <span class="${RANK(a.w)>=70?'rare':''}">${esc(pctLabel(a.w))}</span>${a.credit?` · specific: counts ${a.credit.toFixed(2).replace(/0$/,'')} sizes snugger`:''}</div>`:''}
+      ${snug.length?`<div class="note in" style="--d:3">Snug fits: ${snug.map(w=>esc(W(w).toLowerCase())).join(', ')}</div>`:''}
       <button class="btn main in" style="--d:3" id="next"><span>${last?'See results':'Next round'}</span><span aria-hidden="true">→</span></button>
     </div>
   </div>`;
@@ -712,8 +718,8 @@ function finish(why){
   remember(R.answers.filter(a=>a.w).map(a=>a.w));
   if(!r.quick){
     store.del('live:'+r.n);
-    store.set('v03:'+r.n,res);
-    res.badges=awardBadges(res);if(res.badges.length)store.set('v03:'+r.n,res);
+    store.set('v04:'+r.n,res);
+    res.badges=awardBadges(res);if(res.badges.length)store.set('v04:'+r.n,res);
     log('play',{puzzle:r.n,words:R.answers.filter(a=>a.w).map(a=>a.w),score:total,reached:R.answers.every(a=>(a.p||0)>=90),steps:R.answers.filter(a=>a.w).length,device:DEVICE});
   }else QUICK=null;
   showResults(r,res);
@@ -723,27 +729,27 @@ function untilMidnight(){const n=new Date(),m=new Date(n);m.setHours(24,0,0,0);c
 async function showResults(r,res){
   clearInterval(tick);
   if(!r.quick&&STATS_FOR!==r.n){await loadStats(r.n);STATS_FOR=r.n}
-  const title=r.quick?'Halfway quick play':`Halfway #${pad3(r.n)}`;
+  const title=r.quick?'Snug quick play':`Snug #${pad3(r.n)}`;
   const marks=res.answers.map(a=>mark(a.p||0)).join('');
-  const shareTxt=`${title} · ${fmt(res.total)}/${ROUNDS*MAX_PTS}\n${marks}\nmatryo.io`;
+  const shareTxt=`${title} · ${fmt(res.total)}/${ROUNDS*MAX_PTS}\n${marks}\n${location.host||'matryo.io'}`;
   const bulls=res.answers.filter(a=>(a.p||0)>=100).length;
   app.innerHTML=`${nav()}<div class="narrow" style="max-width:560px">
     <div class="sumrow in" style="--d:1">
       <div style="display:flex;flex-direction:column;gap:4px"><span class="note">${r.quick?'Quick play':`Daily #${pad3(r.n)}`}${res.why==='paused'?' · ended by pausing':''}</span>
         <b class="score num">${fmt(res.total)}</b><span style="font-size:14px">out of ${ROUNDS*MAX_PTS} · ${marks}</span></div>
-      <div class="r">${r.quick?'':`<span>${streak()} day streak</span>`}<span>${bulls} bullseye${bulls===1?'':'s'}</span></div>
+      <div class="r">${r.quick?'':`<span>${streak()} day streak</span>`}<span>${bulls} perfect fit${bulls===1?'':'s'}</span></div>
     </div>
     ${(res.badges||[]).length?`<div class="badge-new in" style="--d:2"><b>New badge${res.badges.length>1?'s':''} · ${res.badges.map(id=>BADGES.find(x=>x.id===id).name).join(', ')}</b><span>${res.badges.map(id=>BADGES.find(x=>x.id===id).how).join(' · ')}</span></div>`:''}
     <div class="in" style="--d:2"><div class="eyebrow" style="margin-bottom:4px">Your rounds</div>
-      <div class="path">${r.qs.map((q,i)=>{const a=res.answers[i]||{},mids=middleWords(q,new Set([q.bigW,q.smallW]),1);
-        return`<div class="prow round"><span class="i num">${i+1}</span><span class="w"><b>${esc(W(q.bigW))} → ${esc(W(q.smallW))}</b><br>
-          <span class="t">${a.w?`you: ${esc(W(a.w).toLowerCase())} · <span class="${RANK(a.w)>=70?'rare':''}">${esc(pctLabel(a.w))}</span>`:'no answer'}${mids[0]?` · middle: ${esc(W(mids[0]).toLowerCase())}`:''}</span></span>
+      <div class="path">${r.qs.map((q,i)=>{const a=res.answers[i]||{},sn=snugWords(q,new Set(a.w?[a.w]:[]),1);
+        return`<div class="prow round"><span class="i num">${i+1}</span><span class="w"><b>${esc(q.phrase.charAt(0).toUpperCase()+q.phrase.slice(1))}</b><br>
+          <span class="t">${a.w?`you: ${esc(W(a.w).toLowerCase())} · <span class="${RANK(a.w)>=70?'rare':''}">${esc(pctLabel(a.w))}</span>`:'no answer'}${sn[0]&&(!a.w||a.p<100)?` · snug: ${esc(W(sn[0]).toLowerCase())}`:''}</span></span>
           <span class="num">${mark(a.p||0)} ${a.p||0}</span></div>`}).join('')}
       </div></div>
     <div class="share in" style="--d:4" id="sh"><span class="eyebrow">Share preview</span>\n${esc(shareTxt)}</div>
     <button class="btn main in" style="--d:5" id="cp"><span id="cpl">Share results</span>${ICON.copy}</button>
     <div class="two in" style="--d:6"><button class="btn" id="again">Quick play</button><button class="btn" id="homeb">Home</button></div>
-    <div class="foot in" style="--d:7">${r.quick?'':`Next daily in <span class="num" id="cd">${untilMidnight()}</span> · `}🎯 90+ · 🟧 60+ · 🟨 30+ · ⬜ under 30 · © 2026 · <a href="${SITE}" target="_blank" rel="noopener">Smidgen Games</a></div>
+    <div class="foot in" style="--d:7">${r.quick?'':`Next daily in <span class="num" id="cd">${untilMidnight()}</span> · `}📦 perfect fit · 🟧 60+ · 🟨 30+ · ⬜ under 30 · © 2026 · <a href="${SITE}" target="_blank" rel="noopener">Smidgen Games</a></div>
   </div>`;
   window.scrollTo(0,0);wireNav();
   tick=setInterval(()=>{const cd=document.getElementById('cd');if(cd)cd.textContent=untilMidnight();else clearInterval(tick)},1000);

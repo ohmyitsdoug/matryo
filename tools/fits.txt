@@ -1,0 +1,123 @@
+# What's the biggest thing that still fits ___?
+# phrase | head word (rejected as an answer, with its kinds) | usable longest size in cm
+# Sizes are the longest thing that fits, roughly: diagonals count, closing the lid counts.
+in your pants pocket | pocket | 16
+in a wallet | wallet | 10
+in a coin purse | purse | 8
+in a matchbox | matchbox | 5
+in a mug | mug | 10
+in a glass | glass | 13
+in a jar | jar | 15
+in a bowl | bowl | 16
+in a teapot | teapot | 18
+in a sandwich bag | bag | 18
+in your hand | hand | 18
+in a sock | sock | 24
+in an envelope | envelope | 24
+in a shoe | shoe | 28
+in a hat | hat | 25
+in a lunchbox | lunchbox | 25
+in a cereal box | box | 30
+in a shoebox | shoebox | 32
+in a purse | purse | 30
+in a vase | vase | 30
+in a bucket | bucket | 32
+in a gift bag | bag | 32
+in a microwave | microwave | 35
+in a pizza box | pizza_box | 40
+in a mailbox | mailbox | 45
+in a backpack | backpack | 48
+in a briefcase | briefcase | 45
+in a basket | basket | 40
+in a toolbox | toolbox | 50
+in a drawer | drawer | 55
+in a dishwasher | dishwasher | 55
+in an oven | oven | 55
+in a sink | sink | 55
+in a fish tank | fish_tank | 60
+in a cooler | cooler | 60
+in a laundry basket | laundry_basket | 60
+in a cardboard box | box | 60
+in a violin case | violin_case | 65
+in a pillowcase | pillowcase | 70
+in a suitcase | suitcase | 75
+in a trash can | trash_can | 75
+in a cupboard | cupboard | 80
+in a wheelbarrow | wheelbarrow | 90
+in a shopping cart | shopping_cart | 90
+in a wagon | wagon | 90
+in a treasure chest | chest | 90
+in a doghouse | doghouse | 90
+in a stroller | stroller | 85
+in a car trunk | trunk | 105
+in a guitar case | guitar_case | 105
+in a crib | crib | 125
+in a fridge | fridge | 140
+in a hot tub | hot_tub | 200
+in a bathtub | bathtub | 160
+in a sandbox | sandbox | 150
+on a skateboard | skateboard | 80
+on a plate | plate | 26
+on a tray | tray | 45
+on a chair | chair | 50
+on a bookshelf | bookshelf | 90
+on a table | table | 180
+on a sofa | sofa | 200
+on a bed | bed | 200
+on a desk | desk | 140
+on a kitchen counter | counter | 180
+on a bike | bicycle | 110
+on a pickup truck | pickup_truck | 250
+on a boat | boat | 500
+on a trailer | trailer | 400
+through a door | door | 200
+through a window | window | 120
+through a cat flap | cat_flap | 20
+through a garage door | garage_door | 500
+in a closet | closet | 220
+in a tent | tent | 220
+in an elevator | elevator | 240
+in a car | car | 200
+in a minivan | minivan | 280
+in a garage | garage | 600
+in a moving truck | moving_truck | 750
+in a shipping container | shipping_container | 600
+in a dumpster | dumpster | 450
+in a school bus | school_bus | 1100
+in a bus | bus | 1100
+in a canoe | canoe | 450
+in a swimming pool | swimming_pool | 1200
+in a barn | barn | 2000
+in an airplane hangar | hangar | 6000
+in a classroom | classroom | 1000
+in a living room | living_room | 700
+in a bedroom | bedroom | 500
+in a bathroom | bathroom | 350
+in a kitchen | kitchen | 500
+in a gym | gym | 3000
+in a church | church | 4000
+in a warehouse | warehouse | 8000
+in a parking lot | parking_lot | 10000
+in a stadium | stadium | 15000
+on a football field | football_field | 11000
+in a backyard | backyard | 2000
+in a birdcage | birdcage | 45
+in a birdhouse | birdhouse | 15
+in a hamster cage | cage | 45
+in a dog crate | crate | 90
+in a mailbag | mailbag | 60
+in a helmet | helmet | 25
+in a glove | glove | 20
+in a cup holder | cup_holder | 12
+in a pencil case | pencil_case | 22
+in a jewelry box | jewelry_box | 18
+in a tissue box | tissue_box | 25
+in a tackle box | tackle_box | 40
+in a piñata | pinata | 40
+in a stocking | stocking | 45
+in a gym bag | gym_bag | 60
+in a duffel bag | duffel_bag | 75
+in a sleeping bag | sleeping_bag | 190
+in a coffin | coffin | 200
+in a phone booth | phone_booth | 210
+in a hot air balloon basket | basket | 150
