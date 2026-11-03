@@ -32,7 +32,7 @@ export default async (req) => {
       review: sort('review', (a, b) => (b.players || 0) - (a.players || 0)),
       auto: sort('auto', (a, b) => String(b.created).localeCompare(String(a.created))).slice(0, 60),
       mine: sort('approved', (a, b) => String(b.decided).localeCompare(String(a.decided))).slice(0, 30),
-      unknown: top.map((u, i) => ({ word: u.word, players: u.devices.size, last: u.last, after: samples[i]?.container || null })),
+      unknown: top.map((u, i) => ({ word: u.word, players: u.devices.size, last: u.last, lo: samples[i]?.lo ?? null, hi: samples[i]?.hi ?? null })),
     });
   }
   if (req.method !== 'POST') return json({ error: 'GET or POST' }, 405);

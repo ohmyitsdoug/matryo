@@ -153,7 +153,7 @@ function words(){
     ${DATA.mine.map(w=>row(w,`${sz(w)}<button class="ghost" data-a="approve">Save size</button><button class="ghost" data-a="reject">Remove</button>`)).join('')||'<div class="dim">None yet.</div>'}
     <h2>Unknown words · last 7 days</h2>
     <div class="small dim">Words players typed that the game didn't know, by how many different players typed them.</div>
-    ${DATA.unknown.map(x=>`<div class="row"><div><div class="w">${esc(U(x.word))}<span class="pill">${x.players} player${x.players===1?'':'s'}</span></div><div class="meta">last ${fmtDay(x.last)}${x.after?' · typed after '+esc(U(x.after)):''}</div></div><div class="acts"><button class="ghost" data-fill="${esc(x.word)}" data-after="${esc(x.after||'')}">Add…</button><button class="ghost" data-ignore="${esc(x.word)}">Ignore</button></div></div>`).join('')||'<div class="dim">None yet.</div>'}`;
+    ${DATA.unknown.map(x=>`<div class="row"><div><div class="w">${esc(U(x.word))}<span class="pill">${x.players} player${x.players===1?'':'s'}</span></div><div class="meta">last ${fmtDay(x.last)}</div></div><div class="acts"><button class="ghost" data-fill="${esc(x.word)}" data-lo="${x.lo??''}" data-hi="${x.hi??''}">Add…</button><button class="ghost" data-ignore="${esc(x.word)}">Ignore</button></div></div>`).join('')||'<div class="dim">None yet.</div>'}`;
 }
 async function act(body,done){
   try{await call('POST',body);MSG=done;DATA=await call('GET');draw()}catch(e){if(e.message!=='401'){MSG=e.message;draw()}}
@@ -166,8 +166,8 @@ function wire(){
   m.querySelectorAll('[data-ignore]').forEach(b=>b.onclick=()=>{b.disabled=true;act({action:'ignore',word:b.dataset.ignore},`Ignoring ${U(b.dataset.ignore)}.`)});
   m.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{
     document.getElementById('aw').value=U(b.dataset.fill);
-    const after=b.dataset.after;   // suggest one size smaller than what it was typed after
-    if(after&&KNOWN[after]!=null){document.getElementById('as').value=cmOfEx(KNOWN[after]-1);document.getElementById('au').value='cm'}
+    const lo=+b.dataset.lo,hi=+b.dataset.hi;   // suggest the middle of the gap it was typed into
+    if(lo&&hi){document.getElementById('as').value=cmOfEx((lo+hi)/2);document.getElementById('au').value='cm'}
     document.getElementById('aw').scrollIntoView({behavior:'smooth',block:'center'});document.getElementById('as').focus();
   });
   const f=document.getElementById('add');if(!f)return;

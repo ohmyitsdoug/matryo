@@ -90,7 +90,24 @@ button[disabled]{opacity:.45;cursor:not-allowed}
 .ctx{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--mut)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;font-size:13px;font-weight:500}
 .chips span{border:2px solid var(--ink);padding:2px 7px}
-.chips span:last-child{background:var(--ink);color:var(--bg)}
+.chips span.hi{box-shadow:2px 2px 0 var(--acc)}
+.sqrow{display:flex;justify-content:space-between;gap:4px}
+.sqr{flex:1;aspect-ratio:1;max-width:40px;border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--mut);box-sizing:border-box}
+.sqr span{opacity:.55}
+.sqr.end{background:var(--ink);color:var(--bg);border:2px solid var(--ink)}
+.sqr.on{border:2px solid var(--ink);background:var(--card);color:var(--ink);box-shadow:2px 2px 0 var(--ink)}
+.sqr.hi{box-shadow:3px 3px 0 var(--acc)}
+.sqlabels{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.ends{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:700;font-size:22px;letter-spacing:-.5px}
+.ends .mid{font-size:12px;font-weight:500;color:var(--mut);letter-spacing:0;text-align:center}
+.lead{font-size:18px!important;font-weight:500}
+.playtop .bar{flex:1;height:10px;margin:0 4px}
+.prow .pct{font-size:12px;color:var(--mut)}
+.prow .pct.rare,.fb .rare{color:var(--acc-text);font-weight:700}
+.prow.endrow{font-weight:700;font-size:16px}
+.prow.gap{border-bottom-style:dashed}
+.prow.gap .w{color:var(--mut)}
+.prow.bonus{font-size:14px}
 .big{font-size:42px;line-height:1;font-weight:700;letter-spacing:-1.5px;overflow-wrap:anywhere}
 .field{position:relative;display:flex;align-items:center;gap:8px;height:56px;padding:0 14px;border:2px solid var(--ink);box-shadow:4px 4px 0 var(--acc);
   font-size:22px;font-weight:500;background:var(--card);cursor:text}
@@ -186,7 +203,10 @@ button[disabled]{opacity:.45;cursor:not-allowed}
   .home .stats .stat:first-child b{font-size:40px}
   .footer{border-top:2px solid var(--ink);margin:0 -32px;padding:18px 32px;text-align:left}
   .page.play{align-items:flex-start}
-  .play .big{font-size:96px;letter-spacing:-4px}
+  .play .ends{font-size:56px;letter-spacing:-2px}
+  .play .ends .mid{font-size:15px}
+  .play .sqr{max-width:64px}
+  .home .sqr{max-width:56px}
   .play .field{height:72px;font-size:30px;max-width:640px;box-shadow:6px 6px 0 var(--acc)}
   .play .chips{display:none}
   .side{display:flex;flex-direction:column;border:2px solid var(--ink);padding:18px 20px}
@@ -202,26 +222,24 @@ button[disabled]{opacity:.45;cursor:not-allowed}
 <script src="config.js" onerror="void 0"></script>
 <script>
 // =====================================================================
-// Matryo v0.1 — name smaller and smaller things from today's place
-// Data: data/words.json (word, exact size, commonness…), data/dailies.json, data/categories.json
+// Matryo v0.2 — mind the gap: name 7 things that fit between a big word and a small word
+// Data: data/words.json (word, exact size, commonness…), data/dailies.json (start + end word for each day)
 // Server: Netlify functions + Netlify Blobs storage (netlify/functions); the game still works without them
 // =====================================================================
 const CFG=Object.assign({api:'/.netlify/functions'},window.MATRYO_CONFIG||{});
 const API=CFG.api;   // Netlify server functions: logging, shared stats, words added after launch
-const VERSION='0.1';
+const VERSION='0.2';
 const DAILY_SECONDS=60, HEADSTART_MS=1500, MAX_PAUSES=2;
-// sizes are on a scale where 1 size = 1.5x. A step's points come from how far down it goes:
-//   less than 1 size smaller (but at least ~10%)  = perfect fit
-//   within ~10% (NEAR) and still smaller          = snug fit
-//   1..6 sizes                                    = 100..25; 7+ sizes is too big a jump
-//   same size but a kind of the last thing         = "kind of" step (DOCTOR after PERSON)
-const NEAR=0.26, MAX_STEPS=6;
-// a word's points add up, and no word scores more than 100:
-//   fit (50 perfect … 10 for 6 sizes, 25 kind of) + on theme 20 + specific 5 per level (max 15) + rare up to 15
-//   played in the last 7 days: half to full, recovering over the week
-const STEP_PTS={0:50,1:40,2:30,3:25,4:20,5:15,6:10}, KIND_PTS=25, MAX_PTS=100;
-const THEME_PTS=20, SPEC_PTS=5, SPEC_MAX=15, THEME_MULT=1.5, COOLDOWN_DAYS=7, MIN_PLAYS_FOR_STATS=25;
-const rarePts=r=>r>=2?15:r>=1.6?10:r>=1.3?5:0;
+// v0.2 "mind the gap": a big word and a small word about 8 sizes apart (1 size = 1.5x).
+// Name 7 things that fit between them, in any order. Lenient on purpose:
+//   a word counts if it's clearly between the two (EDGE) and at least half a size (SPACING) from your other words,
+//   so there are about 14 half-size spots and you need any 7.
+const SLOTS=7, EDGE=0.3, SPACING=0.5;
+// each word scores up to 100: placed 50 + specific 5 per level (max 15) + rare up to 20 + next down 10
+// round bonuses: all 7 = +100, one in every size = +50, finishing early = +2 per second left
+const PLACE_PTS=50, SPEC_PTS=5, SPEC_MAX=15, NEXT_PTS=10, MAX_PTS=100, FULL_PTS=100, EVEN_PTS=50, TIME_PTS=2;
+const COOLDOWN_DAYS=7, MIN_PLAYS_FOR_STATS=25;
+const rarePts=r=>r>=2?20:r>=1.6?15:r>=1.3?10:r>=1.1?5:0;
 const SITE='https://playsmidgen.com/?utm_source=matryo&utm_medium=game&utm_campaign=footer';
 const app=document.getElementById('app');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -234,6 +252,9 @@ const ICON={
   sun:'<svg class="sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   moon:'<svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
   pause:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>',
+  right:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  left:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
+  check:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
   copy:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
 };
 
@@ -246,21 +267,21 @@ function applySettings(){document.documentElement.classList.toggle('calm',!SET.m
 applySettings();
 const reduced=()=>!SET.motion||matchMedia('(prefers-reduced-motion: reduce)').matches;
 function toggleTheme(){const t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;store.set('theme',t)}
-const saved=n=>store.get('v01:'+n,null);          // finished dailies (v0.1 scoring)
+const saved=n=>store.get('v02:'+n,null);          // finished dailies (v0.2 rules)
 const liveSaved=n=>store.get('live:'+n,null);     // a daily that was paused or left mid-round
-function clearResults(){try{Object.keys(localStorage).filter(k=>/^snug:(best|result|r8|v01|recent|live|badges)/.test(k)).forEach(k=>localStorage.removeItem(k))}catch(_){}}
+function clearResults(){try{Object.keys(localStorage).filter(k=>/^snug:(best|result|r8|v01|v02|recent|live|badges)/.test(k)).forEach(k=>localStorage.removeItem(k))}catch(_){}}
 // anonymous id for this device, so admin stats can count unique visitors without accounts
 const DEVICE=(()=>{let d=store.get('device',null);if(!d){d=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now());store.set('device',d)}return d})();
 const todayISO=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 
 // ---------- data ----------
-let ALIAS={},RANK=()=>50,EX={},TIER={},ALTS={},POP={},PARENT={},SPECD={},SQUASH={},KEYS=[],DAILIES=[],CATS=[],TODAY=null,MIN_EX=1;
+let ALIAS={},RANK=()=>50,EX={},TIER={},ALTS={},POP={},PARENT={},SPECD={},SQUASH={},KEYS=[],DAILIES=[],TODAY=null,MIN_EX=1;
 function addWord(w,x,p,spec,parent,alts){
   EX[w]=x;TIER[w]=Math.round(x);POP[w]=p;if(parent){PARENT[w]=parent;SPECD[w]=spec||1}if(alts&&alts.length)ALTS[w]=alts;
   SQUASH[w.replace(/_/g,'')]=w;
 }
 async function loadData(){
-  const [w,d,c]=await Promise.all(['words','dailies','categories'].map(f=>fetch(`data/${f}.json`).then(r=>r.json())));
+  const [w,d]=await Promise.all(['words','dailies'].map(f=>fetch(`data/${f}.json`).then(r=>r.json())));
   for(const r of w.words)addWord(r[0],r[1],r[2],r[3],r[4],r[5]);
   ALIAS=w.aliases||{};   // other everyday names: MED KIT -> FIRST AID KIT
   // words added after launch: by you in admin.html, or automatically once enough players type the same word in a day
@@ -275,7 +296,7 @@ async function loadData(){
       }
     }catch(_){}
   }
-  KEYS=Object.keys(EX);DAILIES=d;CATS=c;MIN_EX=Math.min(...KEYS.map(k=>EX[k]));
+  KEYS=Object.keys(EX);DAILIES=d;MIN_EX=Math.min(...KEYS.map(k=>EX[k]));
   // share of everyday words (not the extra-specific ones) that are more common than this one in English
   const sorted=KEYS.filter(k=>!PARENT[k]).map(k=>POP[k]).sort((a,b)=>a-b);
   RANK=k=>{let lo=0,hi=sorted.length;while(lo<hi){const m=(lo+hi)>>1;if(sorted[m]<=POP[k])lo=m+1;else hi=m}return Math.round(100*(1-lo/sorted.length))};
@@ -303,40 +324,39 @@ function norm(raw){
   // a made-up phrase like GIANT CUP counts as its main word (CUP), without the specific bonus
   const parts=w.split('_');
   if(parts.length>1){for(let i=1;i<parts.length;i++){const tail=look(parts.slice(i).join('_'));if(tail)return{w:tail,from:'phrase'}}}
-  if(w.length<4)return null;
+  // typo fixes only for longer words, and only when the first letter matches (so ATOM never becomes TOM)
+  if(w.length<5)return null;
   const max=w.length>=8?2:1;let bestK=null,bd=9;
-  for(const k of KEYS){if(Math.abs(k.length-w.length)>max)continue;const d=lev(w,k);if(d<bd){bd=d;bestK=k;if(d===1&&max===1)break}}
+  for(const k of KEYS){if(k[0]!==w[0]||Math.abs(k.length-w.length)>max)continue;const d=lev(w,k);if(d<bd){bd=d;bestK=k;if(d===1&&max===1)break}}
   return bd<=max?{w:bestK,from:'typo'}:null;
 }
 
 // ---------- scoring ----------
-// how a new word fits under the current one; null fit = not allowed, with a reason
-function fit(w,cur,curEx){
-  const sizes=[EX[w],...(ALTS[w]||[])].filter(s=>s<curEx).sort((a,b)=>b-a);   // biggest size that is still smaller
-  const kind=roots(w).slice(1).includes(cur);                                    // DOCTOR is a kind of PERSON
-  if(sizes.length){
-    const s=sizes[0],d=curEx-s;
-    if(d<NEAR)return{size:s,kind:'snug',base:STEP_PTS[1]};
-    const steps=d<1?0:Math.floor(d);
-    if(steps>MAX_STEPS)return{no:'bigger'};
-    return{size:s,kind:steps===0?'perfect':steps===1?'snug':steps<=2?'tight':steps<=4?'good':'big',base:STEP_PTS[steps],steps};
+// where a word lands between the two ends; null = not allowed, with a reason
+function place(w,r,placed){
+  const sizes=[EX[w],...(ALTS[w]||[])];
+  const inside=sizes.filter(s=>s<r.big-EDGE&&s>r.small+EDGE);
+  if(!inside.length){
+    if(sizes.every(s=>s>=r.big-EDGE))return{no:sizes.some(s=>s<r.big+EDGE)?'asbig':'big'};
+    if(sizes.every(s=>s<=r.small+EDGE))return{no:sizes.some(s=>s>r.small-EDGE)?'assmall':'small'};
+    return{no:'big'};
   }
-  if(kind)return{size:curEx,kind:'kind',base:KIND_PTS};
-  const near=[EX[w],...(ALTS[w]||[])].some(s=>s-curEx<NEAR);
-  return{no:near?'same':'notsmaller'};
+  const free=inside.filter(s=>placed.every(p=>Math.abs(p.size-s)>=SPACING));
+  if(!free.length){const near=placed.find(p=>Math.abs(p.size-inside[0])<SPACING);return{no:'close',near:near&&near.w}}
+  return{size:free[0]};
 }
-const FIT_LABEL={perfect:'perfect fit',snug:'snug fit',tight:'tight fit',good:'good fit',big:'big step',kind:'kind of'};
-const FIT_BLOCK={perfect:'⭐',snug:'🟦',tight:'🟨',good:'🟨',big:'⬜',kind:'🔹'};
+const band=(x,r)=>Math.min(SLOTS-1,Math.max(0,Math.floor((r.big-EDGE-x)/((r.big-r.small-2*EDGE)/SLOTS))));
 const hasStats=()=>STATS&&STATS_N>=MIN_PLAYS_FOR_STATS;
-// rare: uncommon in everyday English now; once a puzzle has 25+ rounds, uncommon among players
+// rare: uncommon in everyday English now; once a daily has 25+ rounds, uncommon among players
 function rarity(w){
-  if(hasStats()){const pc=STATS[w]||0;return pc<=2?2:pc<=5?1.6:pc<=10?1.3:pc<=20?1:pc<=35?.8:.6}
+  if(hasStats()){const pc=STATS[w]||0;return pc<=2?2:pc<=5?1.6:pc<=10?1.3:pc<=20?1.1:1}
   return Math.min(2,Math.max(.6,Math.round((2.2-POP[w]*.3)*10)/10));
 }
-// the % shown next to a rare word: share of players once there are enough, otherwise how uncommon it is in English
-const rareLabel=w=>hasStats()?`only ${STATS[w]||0}% of players`:`rarer than ${RANK(w)}% of words`;
-const specMult=w=>Math.min(2,1+.25*specificity(w));
-function onTheme(w,theme){return theme&&roots(w).some(x=>theme.has(x))}
+// the % shown next to every word: share of players once there are enough, otherwise how common it is in English
+function pctLabel(w){
+  if(hasStats())return`said by ${STATS[w]||0}% of players`;
+  const r=RANK(w);return r>=50?`rarer than ${r}% of words`:`top ${Math.max(1,r)}% most common`;
+}
 function cooldown(w){ // played in the last 7 days: worth half, recovering a little each day
   const last=store.get('recent',{})[w];if(!last)return 1;
   const days=Math.round((new Date(todayISO())-new Date(last))/864e5);
@@ -344,6 +364,10 @@ function cooldown(w){ // played in the last 7 days: worth half, recovering a lit
 }
 function remember(words){const r=store.get('recent',{}),t=todayISO();words.forEach(w=>r[w]=t);
   for(const k in r)if((new Date(t)-new Date(r[k]))/864e5>COOLDOWN_DAYS)delete r[k];store.set('recent',r)}
+function roundBonus(placed,r,secsLeft){
+  const full=placed.length>=SLOTS, even=new Set(placed.map(p=>band(p.size,r))).size>=SLOTS;
+  return{full:full?FULL_PTS:0,even:even?EVEN_PTS:0,time:full?Math.round(secsLeft)*TIME_PTS:0};
+}
 
 // ---------- backend (optional): logging and shared stats ----------
 function log(kind,payload){
@@ -357,23 +381,27 @@ async function loadStats(n){
 }
 
 // ---------- puzzles ----------
-function puzzleFor(d){const c=CATS.find(x=>x.cat===d.cat)||{words:[]};return{...d,theme:new Set(c.words)}}
-// the smallest thing on the place's own list (PILL for a hospital)
-function smallestOnTheme(r){let best=null;for(const k of r.theme)if(EX[k]!=null&&(!best||EX[k]<EX[best]))best=k;return best}
+function puzzleFor(d){return{...d,big:EX[d.start]??d.start_size,small:EX[d.end]??d.end_size}}
+const pairLabel=d=>`${W(d.start)} → ${W(d.end)}`;
 let QUICK=null;   // a paused quick round (kept in memory only)
 function quick(){
-  const pool=CATS.filter(c=>c.cat!==TODAY.cat);const c=pool[Math.floor(Math.random()*pool.length)];
-  const d=DAILIES.find(x=>x.cat===c.cat);
+  const pool=DAILIES.filter(d=>d.n!==TODAY.n);const d=pool[Math.floor(Math.random()*pool.length)];
   leave({...puzzleFor(d),n:0,quick:true,secs:DAILY_SECONDS,date:TODAY.date});
+}
+// common everyday words for a size you left empty (most played once there's data)
+function suggestions(r,k,used,n=3){
+  const pool=KEYS.filter(w=>!PARENT[w]&&!used.has(w)&&EX[w]<r.big-EDGE&&EX[w]>r.small+EDGE&&band(EX[w],r)===k&&!ALTS[w]);
+  pool.sort((a,b)=>hasStats()?((STATS[b]||0)-(STATS[a]||0))||(POP[b]-POP[a]):POP[b]-POP[a]);
+  return pool.slice(0,n);
 }
 
 // ---------- badges and history (dailies only) ----------
 const BADGES=[
   {id:'first',name:'First steps',how:'Finish your first daily'},
-  {id:'perfect3',name:'Tight squeeze',how:'3 perfect fits in one daily'},
-  {id:'snug5',name:'Snug as a bug',how:'5 snug or perfect fits in one daily'},
+  {id:'full',name:'Full house',how:'Fill all 7 in a daily'},
+  {id:'even',name:'Even steps',how:'One thing in every size'},
+  {id:'speedy',name:'Quick fit',how:'Fill all 7 with 20+ seconds left'},
   {id:'deep',name:'Deep cut',how:'A word 2 steps more specific than its everyday name'},
-  {id:'k1000',name:'Four digits',how:'Score 1,000+ in a daily'},
   {id:'streak7',name:'Week streak',how:'Play 7 dailies in a row'},
 ];
 function history(){return DAILIES.filter(d=>d.date<=TODAY.date).map(d=>({d,res:saved(d.n)})).filter(x=>x.res)}
@@ -387,10 +415,10 @@ function awardBadges(res){
   const have=store.get('badges',{}),got=[];
   const earn=(id,ok)=>{if(ok&&!have[id]){have[id]=todayISO();got.push(id)}};
   earn('first',true);
-  earn('perfect3',res.steps.filter(x=>x.kind==='perfect').length>=3);
-  earn('snug5',res.steps.filter(x=>x.kind==='perfect'||x.kind==='snug').length>=5);
-  earn('deep',res.steps.some(x=>specificity(x.w)>=2));
-  earn('k1000',res.total>=1000);
+  earn('full',res.placed.length>=SLOTS);
+  earn('even',res.bonus.even>0);
+  earn('speedy',res.placed.length>=SLOTS&&res.left>=20);
+  earn('deep',res.placed.some(x=>specificity(x.w)>=2));
   earn('streak7',streak()>=7);
   store.set('badges',have);return got;
 }
@@ -409,6 +437,13 @@ const statBoxes=()=>{const sc=history().map(x=>x.res.total);return`
   <div class="stat"><b class="num">${streak()}</b><span>day streak</span></div>
   <div class="stat"><b class="num">${sc.length?fmt(Math.max(...sc)):'–'}</b><span>best</span></div>
   <div class="stat"><b class="num">${Object.keys(store.get('badges',{})).length}/${BADGES.length}</b><span>badges</span></div>`};
+// nine equal squares: the two ends (arrows pointing in) and the 7 to fill, in size order
+function squares(placed,hi){
+  const sorted=[...(placed||[])].sort((a,b)=>b.size-a.size);
+  let h=`<span class="sqr end" aria-hidden="true">${ICON.right}</span>`;
+  for(let i=0;i<SLOTS;i++){const p=sorted[i];h+=p?`<span class="sqr on ${p.w===hi?'hi':''}" title="${esc(W(p.w))}">${ICON.check}</span>`:'<span class="sqr"><span>?</span></span>'}
+  return`<div class="sqrow" role="img" aria-label="${sorted.length} of ${SLOTS} filled">${h}<span class="sqr end" aria-hidden="true">${ICON.left}</span></div>`;
+}
 
 // ---------- home ----------
 let S=null,tick=null;
@@ -427,9 +462,11 @@ function showStart(){
     <div class="main-col">
       <div class="daily in" style="--d:3">
         <span class="tag">Daily #${pad3(TODAY.n)} · ${fmtDate(TODAY.date)}</span>
-        <h1>${esc(TC(TODAY.cat))}</h1>
-        <p>Name as many things as you can, each one a little smaller than the last. The tighter the fit, the more it scores, and specific, on-theme words score extra.</p>
-        <div class="fine">Everyday items. No proper nouns. 60 seconds. <a href="#how" class="howlink" id="how">How scoring works</a></div>
+        <h1>Mind the gap</h1>
+        <p class="lead">One big thing. One small thing.<br>Fill the 7 sizes in between.</p>
+        <div style="width:100%;margin-top:4px">${squares(live?live.placed:res?res.placed:[])}
+          <div class="sqlabels"><span>big</span><span>7 in between</span><span>small</span></div></div>
+        <div class="fine">60 seconds. Everyday things, no names. Words revealed when you start. <a href="#how" class="howlink" id="how">How scoring works</a></div>
       </div>
       <div class="cta in" style="--d:4">
         <button class="btn main" id="daily">${play}</button>
@@ -449,23 +486,22 @@ function showStart(){
 function showHelp(){
   app.innerHTML=`${nav()}<div class="narrow help in" style="--d:1;display:flex;flex-direction:column;gap:12px">
     <div class="head"><h2>How it works</h2><button class="sq" id="back">Back</button></div>
-    <p>Each daily has a place, like <b>a hospital</b>, and a big thing to start from. Name something smaller, then something smaller than that, as many as you can in 60 seconds.</p>
+    <p>When the round starts you see a big thing and a small thing, like <b>bathtub</b> and <b>garlic</b>. Name 7 things that are smaller than the big one and bigger than the small one, in any order, in 60 seconds.</p>
+    <p class="note">Each one has to be a different size from your others: about half a size apart (one size is about 1.5×). Too close to one you already have and it won't count, but it costs nothing. Something about as big as either end doesn't count either.</p>
     <h3>EACH WORD SCORES UP TO 100</h3>
-    <table class="pt"><thead><tr><th>For the fit</th><th>Points</th></tr></thead><tbody>
-      <tr><td>Perfect fit · a little smaller, less than one size down</td><td>50</td></tr>
-      <tr><td>Snug fit · about one size down, or just barely smaller</td><td>40</td></tr>
-      <tr><td>2 / 3 / 4 / 5 / 6 sizes down</td><td>30 / 25 / 20 / 15 / 10</td></tr>
-      <tr><td>Kind of · same size, but a kind of the last thing (doctor after person)</td><td>25</td></tr>
-    </tbody></table>
-    <table class="pt"><thead><tr><th>Plus</th><th>Points</th></tr></thead><tbody>
-      <tr><td>On theme · something you'd usually find at today's place</td><td>+20</td></tr>
+    <table class="pt"><thead><tr><th>Part</th><th>Points</th></tr></thead><tbody>
+      <tr><td>Fits in the gap</td><td>50</td></tr>
       <tr><td>Specific · cup → coffee cup → demitasse, per level</td><td>+5, up to +15</td></tr>
-      <tr><td>Rare · fewer people say it</td><td>up to +15</td></tr>
+      <tr><td>Rare · fewer people say it</td><td>up to +20</td></tr>
+      <tr><td>Next down · smaller than the word you named before it</td><td>+10</td></tr>
     </tbody></table>
-    <p class="note">One size is about 1.5× smaller. Jump more than 6 sizes and you'll see <b>Think bigger</b>: that guess doesn't count, but it costs nothing. Something about the same size doesn't count either. A word you played in the last 7 days scores half, recovering over the week.</p>
-    <p class="note">Rare words show how rare they are: at first by how uncommon the word is in English, then by how few players said it.</p>
-    <h3>THE END OF A RUN</h3>
-    <p>The round ends when time runs out, or if you reach something so small there's nothing smaller. Racing down in big steps ends your run early; small, tight steps keep it going.</p>
+    <h3>ROUND BONUSES</h3>
+    <table class="pt"><tbody>
+      <tr><td>All 7 filled</td><td>+100</td></tr>
+      <tr><td>Even steps · one thing in every size between the ends</td><td>+50</td></tr>
+      <tr><td>Finished early · per second left</td><td>+2</td></tr>
+    </tbody></table>
+    <p class="note">Every word shows how rare it is: at first by how common the word is in English, then by how many players said it. A word you played in the last 7 days scores half, recovering over the week.</p>
     <h3>PAUSING</h3>
     <p>Tap pause to step away. You can pause a daily twice; pausing a third time ends it.</p>
     <h3>WHAT COUNTS</h3>
@@ -499,8 +535,8 @@ function showMenu(){
     <div class="badges in" style="--d:4">${BADGES.map(b=>`<div class="badge ${have[b.id]?'on':''}"><b>${b.name}</b><span>${b.how}</span></div>`).join('')}</div>
     <div class="eyebrow in" style="--d:5">History</div>
     <div class="list in" style="--d:5">
-      ${todayRes?'':`<button class="lrow" data-n="${TODAY.n}"><span>Today · #${pad3(TODAY.n)} · ${esc(TC(TODAY.cat))}</span><span class="mut">${liveSaved(TODAY.n)?'Paused':'Not played'}</span></button>`}
-      ${hist.map(x=>`<button class="lrow" data-n="${x.d.n}"><span>#${pad3(x.d.n)} · ${fmtDate(x.d.date)} · ${esc(TC(x.d.cat))}</span><b>${fmt(x.res.total)}</b></button>`).join('')}
+      ${todayRes?'':`<button class="lrow" data-n="${TODAY.n}"><span>Today · #${pad3(TODAY.n)}</span><span class="mut">${liveSaved(TODAY.n)?'Paused':'Not played'}</span></button>`}
+      ${hist.map(x=>`<button class="lrow" data-n="${x.d.n}"><span>#${pad3(x.d.n)} · ${fmtDate(x.d.date)} · ${esc(pairLabel(x.d))}</span><b>${fmt(x.res.total)}</b></button>`).join('')}
       ${hist.length?'':'<div class="note" style="padding:10px 2px">Your finished dailies will show up here.</div>'}
     </div>
     <div class="eyebrow in" style="--d:6">Settings</div>
@@ -534,35 +570,32 @@ function leave(r,resume){
 function saveLive(){ // dailies only: what's needed to resume, and to stop a reload from restarting the clock
   if(!S||S.r.quick)return;
   const left=S.clock?Math.max(0,S.end-Date.now()):S.left;
-  store.set('live:'+S.r.n,{chain:S.chain,score:S.score,cur:S.cur,curEx:S.curEx,used:[...S.used],left,pauses:S.pauses,running:S.live});
+  store.set('live:'+S.r.n,{placed:S.placed,score:S.score,used:[...S.used],left,pauses:S.pauses,running:S.live,last:S.last});
 }
 function startRound(r,resume){
   const secs=r.secs||DAILY_SECONDS;
   if(r.quick)QUICK=null;
-  S={r,secs,cur:r.start,curEx:EX[r.start],chain:[],used:new Set([r.start]),score:0,end:0,left:secs*1000,pauses:0,live:false,clock:false,
-     ...(resume?{chain:resume.chain,score:resume.score,cur:resume.cur,curEx:resume.curEx,used:new Set(resume.used),left:resume.left,pauses:resume.pauses}:{})};
+  S={r,secs,placed:[],used:new Set([r.start,r.end]),score:0,end:0,left:secs*1000,pauses:0,live:false,clock:false,last:null,
+     ...(resume?{placed:resume.placed,score:resume.score,used:new Set(resume.used),left:resume.left,pauses:resume.pauses,last:resume.last}:{})};
   if(!r.quick)loadStats(r.n);
   app.innerHTML=`<div class="page play">
-    <div class="main-col" style="display:flex;flex-direction:column;gap:11px">
+    <div class="main-col" style="display:flex;flex-direction:column;gap:10px">
       <div class="playtop in" style="--d:0">
         <button class="sq icon" id="pause" aria-label="Pause">${ICON.pause}</button>
         <span class="timer num" id="t">${clock(Math.ceil(S.left/1000))}</span>
-        <span class="tag pts num" id="sc">${fmt(S.score)} pts</span>
+        <div class="bar" id="bar"><div style="width:${100*S.left/(secs*1000)}%"></div></div>
+        <span class="tag pts num" id="sc"></span>
       </div>
-      <div class="bar in" id="bar" style="--d:1"><div style="width:${100*S.left/(secs*1000)}%"></div></div>
-      <div class="ctx in" style="--d:1"><span>${esc(TC(r.cat))}${r.quick?' · quick play':''}</span><span id="pl"></span></div>
+      <div class="ends in" style="--d:1"><span>${esc(W(r.start))}</span><span class="mid" id="pl"></span><span>${esc(W(r.end))}</span></div>
+      <div class="in" id="sqs" style="--d:1"></div>
       <div class="chips in" id="chips" style="--d:2"></div>
-      <div class="in" style="--d:2;display:flex;flex-direction:column;gap:2px;margin-top:2px">
-        <div class="eyebrow">Smaller than</div>
-        <div class="big" id="big"></div>
-      </div>
-      <form id="f" class="in" style="--d:3" autocomplete="off">
+      <form id="f" class="in" style="--d:2" autocomplete="off">
         <label for="g" class="field"><span class="mut">›</span><span class="mirror" id="m"></span><span class="caret"></span>
-          <input id="g" aria-label="Something smaller" autocapitalize="off" autocorrect="on" spellcheck="true" enterkeyhint="go" maxlength="32"></label>
+          <input id="g" aria-label="Something between ${esc(W(r.start))} and ${esc(W(r.end))}" autocapitalize="off" autocorrect="on" spellcheck="true" enterkeyhint="go" maxlength="32"></label>
       </form>
       <div class="fb" id="fb" aria-live="polite"></div>
     </div>
-    <aside class="side-col"><div class="side"><div class="eyebrow" style="margin-bottom:8px">Your path</div><div class="path" id="side"></div></div></aside>
+    <aside class="side-col"><div class="side"><div class="eyebrow" style="margin-bottom:8px">Biggest to smallest</div><div class="path" id="side"></div></div></aside>
   </div>`;
   const g=document.getElementById('g');
   // the clock starts at the first keystroke, or a moment after GO, whichever comes first
@@ -597,7 +630,7 @@ function pause(){
   if(!S)return;
   if(S.r.quick){ // quick play: pause as often as you like, kept until you leave the page
     S.left=S.clock?Math.max(0,S.end-Date.now()):S.left;clearInterval(tick);
-    QUICK={r:S.r,chain:S.chain,score:S.score,cur:S.cur,curEx:S.curEx,used:[...S.used],left:S.left,pauses:0};S=null;showStart();return;
+    QUICK={r:S.r,placed:S.placed,score:S.score,used:[...S.used],left:S.left,pauses:0,last:S.last};S=null;showStart();return;
   }
   if(S.pauses>=MAX_PAUSES){
     const b=document.getElementById('pause');
@@ -608,17 +641,15 @@ function pause(){
   S.pauses++;S.clock=false;S.live=false;saveLive();S=null;showStart();
 }
 function drawPlay(){
-  const big=document.getElementById('big'),w=W(S.cur);
-  big.textContent=w;
-  const desk=matchMedia('(min-width:900px)').matches;
-  big.style.fontSize=desk?'':Math.min(42,Math.floor((Math.min(innerWidth,440)-40)/(w.length*.56)))+'px';
-  const path=[S.r.start,...S.chain.map(c=>c.w)];
-  document.getElementById('chips').innerHTML=path.slice(-6).map(x=>`<span>${esc(W(x))}</span>`).join('');
-  document.getElementById('sc').textContent=fmt(S.score)+' pts';
+  const sorted=[...S.placed].sort((a,b)=>b.size-a.size);
+  document.getElementById('sqs').innerHTML=squares(S.placed,S.last);
+  document.getElementById('chips').innerHTML=sorted.map(x=>`<span class="${x.w===S.last?'hi':''}">${esc(W(x.w))}</span>`).join('');
+  document.getElementById('sc').textContent=`${S.placed.length}/${SLOTS} · ${fmt(S.score)}`;
   const left=MAX_PAUSES-S.pauses;
-  document.getElementById('pl').textContent=S.r.quick?'':left>0?`${left} pause${left===1?'':'s'} left`:'no pauses left';
-  document.getElementById('side').innerHTML=`<div class="prow start"><span class="w">${esc(W(S.r.start))}</span><span>start</span></div>`+
-    S.chain.map(x=>`<div class="prow"><span class="w">${esc(W(x.w))}</span><span class="num">+${x.p}</span></div>`).join('');
+  document.getElementById('pl').textContent=S.r.quick?'7 in between':left>0?`7 in between · ${left} pause${left===1?'':'s'}`:'7 in between';
+  document.getElementById('side').innerHTML=`<div class="prow endrow"><span class="w">${esc(W(S.r.start))}</span><span class="mut">big</span></div>`+
+    sorted.map(x=>`<div class="prow"><span class="w">${esc(W(x.w))}</span><span class="num">+${x.p}</span></div>`).join('')+
+    `<div class="prow endrow"><span class="w">${esc(W(S.r.end))}</span><span class="mut">small</span></div>`;
 }
 function say(kind,msg,detail){
   const fb=document.getElementById('fb');if(!fb)return;
@@ -628,23 +659,25 @@ function say(kind,msg,detail){
 function submit(raw){
   if(!raw.trim()||!S||!S.live)return;
   const hit=norm(raw),r=S.r,typed=raw.trim();
-  if(!hit){log('miss',{word:typed.toLowerCase().slice(0,40),puzzle:r.n||null,container:S.cur,containerSize:S.curEx,device:DEVICE});return say('no',`"${typed}" isn't in our list yet. Try an everyday name.`)}
+  if(!hit){log('miss',{word:typed.toLowerCase().slice(0,40),puzzle:r.n||null,lo:r.small,hi:r.big,device:DEVICE});return say('no',`"${typed}" isn't in our list yet. Try an everyday name.`)}
   const w=hit.w,note=hit.from?`${typed} → ${W(w)}. `:'';
-  if(S.used.has(w))return say('no',note+`${W(w)} is already used.`);
-  const f=fit(w,S.cur,S.curEx);
-  if(f.no==='bigger')return say('no',note+`${W(w)} is too small. Think bigger.`);
-  if(f.no==='same')return say('no',note+`${W(w)} is about the same size as ${W(S.cur).toLowerCase()}. Go a little smaller.`);
-  if(f.no)return say('no',note+`${W(w)} isn't smaller than ${W(S.cur).toLowerCase()}.`);
-  const m={rare:rarity(w),spec:hit.from==='phrase'?1:specMult(w),theme:onTheme(w,r.theme)?THEME_MULT:1,cool:cooldown(w)};
-  const bonus=(m.theme>1?THEME_PTS:0)+(hit.from==='phrase'?0:Math.min(SPEC_MAX,SPEC_PTS*specificity(w)))+rarePts(m.rare);
-  const p=Math.max(5,Math.min(MAX_PTS,Math.round((f.base+bonus)*m.cool/5)*5));
-  S.score+=p;S.chain.push({w,p,kind:f.kind,...m});S.used.add(w);S.cur=w;S.curEx=f.size;
-  const tags=[FIT_LABEL[f.kind],m.spec>1&&'specific',m.theme>1&&'on theme',m.cool<1&&'played recently'].filter(Boolean).map(esc);
-  if(m.rare>=1.3)tags.push(`<span class="rare">${esc(rareLabel(w))}</span>`);
+  if(S.used.has(w))return say('no',note+(w===r.start||w===r.end?`${W(w)} is one of the ends.`:`${W(w)} is already in.`));
+  const f=place(w,r,S.placed);
+  const big=W(r.start).toLowerCase(),small=W(r.end).toLowerCase();
+  if(f.no==='big')return say('no',note+`${W(w)} is bigger than ${big}.`);
+  if(f.no==='asbig')return say('no',note+`${W(w)} is about as big as ${big}. Go a little smaller.`);
+  if(f.no==='small')return say('no',note+`${W(w)} is smaller than ${small}.`);
+  if(f.no==='assmall')return say('no',note+`${W(w)} is about as small as ${small}. Go a little bigger.`);
+  if(f.no==='close')return say('no',note+`${W(w)} is too close in size to ${W(f.near||'one you have').toLowerCase()}. Try a size you don't have yet.`);
+  const prev=S.placed[S.placed.length-1];
+  const m={rare:rarity(w),spec:hit.from==='phrase'?0:Math.min(SPEC_MAX,SPEC_PTS*specificity(w)),next:prev&&f.size<prev.size?NEXT_PTS:0,cool:cooldown(w)};
+  const p=Math.max(5,Math.min(MAX_PTS,Math.round((PLACE_PTS+m.spec+rarePts(m.rare)+m.next)*m.cool/5)*5));
+  S.score+=p;S.placed.push({w,p,size:f.size,...m});S.used.add(w);S.last=w;
+  const tags=[m.spec&&'specific',m.next&&'next down',m.cool<1&&'played recently'].filter(Boolean).map(esc);
+  tags.push(`<span class="${m.rare>=1.3?'rare':''}">${esc(pctLabel(w))}</span>`);
   say('ok',`+${p}`,esc(note+W(w))+' · '+tags.join(' · '));
   drawPlay();saveLive();
-  // nothing in the list is smaller than this: the run is over
-  if(S.curEx-MIN_EX<NEAR){S.live=false;clearInterval(tick);setTimeout(()=>finish('end'),1100)}
+  if(S.placed.length>=SLOTS){S.live=false;clearInterval(tick);S.left=Math.max(0,S.end-Date.now());setTimeout(()=>finish('full'),900)}
 }
 
 // ---------- results ----------
@@ -653,14 +686,16 @@ function finish(why){
   if(!S)return;
   const R=S;S=null;
   document.activeElement&&document.activeElement.blur();
-  const r=R.r,words=R.chain.map(x=>x.w);
-  const res={why,secs:R.secs,total:R.score,used:[...R.used],steps:R.chain,pauses:R.pauses};
-  remember(words);
+  const r=R.r,secsLeft=why==='full'?Math.floor((R.left||0)/1000):0;
+  const bonus=roundBonus(R.placed,r,secsLeft);
+  const total=R.score+bonus.full+bonus.even+bonus.time;
+  const res={why,secs:R.secs,placed:R.placed,used:[...R.used],words:R.score,bonus,total,left:secsLeft,pauses:R.pauses};
+  remember(R.placed.map(x=>x.w));
   if(!r.quick){
     store.del('live:'+r.n);
-    store.set('v01:'+r.n,res);
-    res.badges=awardBadges(res);if(res.badges.length)store.set('v01:'+r.n,res);
-    log('play',{puzzle:r.n,words,score:res.total,reached:why==='end',steps:words.length,device:DEVICE});
+    store.set('v02:'+r.n,res);
+    res.badges=awardBadges(res);if(res.badges.length)store.set('v02:'+r.n,res);
+    log('play',{puzzle:r.n,words:R.placed.map(x=>x.w),score:total,reached:R.placed.length>=SLOTS,steps:R.placed.length,device:DEVICE});
   }else QUICK=null;
   showResults(r,res);
 }
@@ -669,39 +704,34 @@ function untilMidnight(){const n=new Date(),m=new Date(n);m.setHours(24,0,0,0);c
 async function showResults(r,res){
   clearInterval(tick);
   if(!r.quick&&STATS_FOR!==r.n){await loadStats(r.n);STATS_FOR=r.n}
-  const steps=res.steps,used=new Set(res.used);
+  const placed=[...res.placed].sort((a,b)=>b.size-a.size),used=new Set(res.used);
+  const n=placed.length,covered=new Set(placed.map(p=>band(p.size,r)));
   const title=r.quick?'Matryo quick play':`Matryo #${pad3(r.n)}`;
-  const shareTxt=`${title} · ${TC(r.cat)}\n${steps.map(x=>FIT_BLOCK[x.kind]||'⬜').join('')||'—'}\n${fmt(res.total)} pts · ${steps.length} thing${steps.length===1?'':'s'}\nmatryo.io`;
-  const perfect=steps.filter(x=>x.kind==='perfect').length;
-  const last=steps.length?steps[steps.length-1].w:r.start;
-  const tiny=smallestOnTheme(r);
-  const passed=tiny&&EX[last]<=EX[tiny];
-  const ended={time:"Time's up",end:'Nothing smaller left!',paused:'Ended by pausing'}[res.why]||"Time's up";
-  // the rarest word you played gets its % in orange
-  const tags=x=>[FIT_LABEL[x.kind],x.theme>1&&'on theme',x.spec>1&&'specific',x.cool<1&&'played recently'].filter(Boolean).join(' · ');
-  // example path: one on-theme thing per size, from the start down to the smallest on-theme thing; yours marked
-  const mine=new Map(steps.map(x=>[TIER[x.w],x.w]));
-  const byTier={};for(const k of r.theme)if(EX[k]!=null&&!used.has(k))(byTier[TIER[k]]=byTier[TIER[k]]||[]).push(k);
-  for(const t in byTier)byTier[t].sort((a,b)=>hasStats()?(STATS[b]||0)-(STATS[a]||0):POP[b]-POP[a]);
-  const ladder=[];for(let t=TIER[r.start]-1;t>=(tiny?TIER[tiny]:1);t--){if(mine.has(t))ladder.push({w:mine.get(t),you:true});else if(byTier[t])ladder.push({w:byTier[t][0]})}
+  const strip=[...Array(SLOTS).keys()].map(k=>covered.has(k)?'🟧':'⬜').join('');
+  const shareTxt=`${title} · ${n}/${SLOTS} · ${fmt(res.total)} pts\n➡️${strip}⬅️\nmatryo.io`;
+  const ended={time:"Time's up",full:'All 7 filled!',paused:'Ended by pausing'}[res.why]||"Time's up";
+  // top to bottom, biggest to smallest: your words, plus the sizes you left empty with common answers
+  const span=(r.big-r.small-2*EDGE)/SLOTS;
+  const rows=placed.map(x=>({size:x.size,x}));
+  for(let k=0;k<SLOTS;k++)if(!covered.has(k)){const s=suggestions(r,k,used);if(s.length)rows.push({size:r.big-EDGE-span*(k+.5),gap:s})}
+  rows.sort((a,b)=>b.size-a.size);
+  const tags=x=>[x.spec&&'specific',x.next&&'next down',x.cool<1&&'played recently'].filter(Boolean).join(' · ');
+  const bonusRows=[[res.bonus.full,'All 7 filled'],[res.bonus.even,'Even steps · one in every size'],[res.bonus.time,`Finished early · ${res.left}s left`]].filter(b=>b[0]);
   app.innerHTML=`${nav()}<div class="narrow" style="max-width:560px">
     <div class="sumrow in" style="--d:1">
-      <div style="display:flex;flex-direction:column;gap:4px"><span class="note">${r.quick?'Quick play':`Daily #${pad3(r.n)}`} · ${esc(TC(r.cat))}</span>
-        <b class="score num">${fmt(res.total)}</b><span style="font-size:14px">points · ${esc(ended)}</span></div>
-      <div class="r"><span><b class="num">${steps.length}</b> thing${steps.length===1?'':'s'}</span>${perfect?`<span>${perfect} perfect fit${perfect===1?'':'s'}</span>`:''}${r.quick?'':`<span>${streak()} day streak</span>`}</div>
+      <div style="display:flex;flex-direction:column;gap:4px"><span class="note">${r.quick?'Quick play':`Daily #${pad3(r.n)}`} · ${esc(pairLabel(r))}</span>
+        <b class="score num">${n} of ${SLOTS}</b><span style="font-size:14px">${fmt(res.total)} points · ${esc(ended)}</span></div>
+      <div class="r">${r.quick?'':`<span>${streak()} day streak</span>`}<span>${covered.size} of ${SLOTS} sizes</span></div>
     </div>
     ${(res.badges||[]).length?`<div class="badge-new in" style="--d:2"><b>New badge${res.badges.length>1?'s':''} · ${res.badges.map(id=>BADGES.find(x=>x.id===id).name).join(', ')}</b><span>${res.badges.map(id=>BADGES.find(x=>x.id===id).how).join(' · ')}</span></div>`:''}
-    <div class="in" style="--d:2"><div class="eyebrow" style="margin-bottom:4px">Your path</div>
+    <div class="in" style="--d:2"><div class="eyebrow" style="margin-bottom:4px">Biggest to smallest</div>
       <div class="path">
-        <div class="prow start"><span class="i">·</span><span class="w">${esc(W(r.start))}</span><span>start</span></div>
-        ${steps.map((x,i)=>`<div class="prow"><span class="i num">${i+1}</span><span class="w">${esc(W(x.w))} <span class="t">· ${esc(tags(x))}</span>${x.rare>=1.3?` <span class="rare">· ${esc(rareLabel(x.w))}</span>`:''}</span><span class="num">+${x.p}</span></div>`).join('')||'<div class="note" style="padding:8px 0">No words this round. Try again!</div>'}
+        <div class="prow endrow"><span class="w">${esc(W(r.start))}</span><span class="mut">start</span></div>
+        ${rows.map(o=>o.x?`<div class="prow"><span class="w">${esc(W(o.x.w))}${tags(o.x)?` <span class="t">· ${esc(tags(o.x))}</span>`:''}<br><span class="pct ${o.x.rare>=1.3?'rare':''}">${esc(pctLabel(o.x.w))}</span></span><span class="num">+${o.x.p}</span></div>`
+          :`<div class="prow gap"><span class="w">No word at this size <span class="t">· e.g. ${o.gap.map(w=>esc(W(w).toLowerCase())).join(', ')}</span></span><span></span></div>`).join('')}
+        <div class="prow endrow"><span class="w">${esc(W(r.end))}</span><span class="mut">end</span></div>
+        ${bonusRows.map(([v,l])=>`<div class="prow bonus"><span class="w">${esc(l)}</span><span class="num">+${v}</span></div>`).join('')}
       </div></div>
-    ${tiny?`<div class="in" style="--d:3;display:flex;flex-direction:column;gap:6px"><div class="eyebrow">How small it goes</div>
-      <div class="range"><div><b>${esc(W(last))}</b><span>where you stopped</span></div><span class="mut" aria-hidden="true" style="font-size:20px">→</span><div><b>${esc(W(tiny))}</b><span>smallest on theme</span></div></div>
-      <div class="note">${passed?`You made it past the smallest ${esc(r.cat.toLowerCase().replace(/^(a|an|the) /,''))} thing on our list.`:`${TIER[last]-TIER[tiny]} more size${TIER[last]-TIER[tiny]===1?'':'s'} to go.`}</div>
-      <button class="sq" id="rv" style="align-self:flex-start">Show a typical path</button>
-      <div id="lad" hidden><div class="ladder">${ladder.map(x=>`<div class="${x.you?'you':'x'}"><span>${x.you?'› ':''}${esc(W(x.w))}</span><span>${x.you?'yours':''}</span></div>`).join('')}</div></div>
-    </div>`:''}
     <div class="share in" style="--d:4" id="sh"><span class="eyebrow">Share preview</span>\n${esc(shareTxt)}</div>
     <button class="btn main in" style="--d:5" id="cp"><span id="cpl">Share results</span>${ICON.copy}</button>
     <div class="two in" style="--d:6"><button class="btn" id="again">Quick play</button><button class="btn" id="homeb">Home</button></div>
@@ -711,8 +741,6 @@ async function showResults(r,res){
   tick=setInterval(()=>{const cd=document.getElementById('cd');if(cd)cd.textContent=untilMidnight();else clearInterval(tick)},1000);
   document.getElementById('again').onclick=quick;
   document.getElementById('homeb').onclick=showStart;
-  const rv=document.getElementById('rv');
-  if(rv)rv.onclick=()=>{const l=document.getElementById('lad');l.hidden=!l.hidden;rv.textContent=l.hidden?'Show a typical path':'Hide the typical path'};
   document.getElementById('cp').onclick=async()=>{
     const lab=document.getElementById('cpl');
     try{if(navigator.share&&matchMedia('(pointer:coarse)').matches){await navigator.share({text:shareTxt});return}}catch(_){}
@@ -726,9 +754,11 @@ app.innerHTML='<div class="note" style="padding:40px 0">Loading…</div>';
 loadData().then(()=>{
   // a daily left mid-round (tab closed or reloaded) counts as a pause
   const live=liveSaved(TODAY.n);
-  if(live&&live.running){live.running=false;live.pauses++;store.set('live:'+TODAY.n,live)}
-  if(live&&live.pauses>MAX_PAUSES&&!saved(TODAY.n)){
-    S={r:puzzleFor(TODAY),secs:DAILY_SECONDS,cur:live.cur,curEx:live.curEx,chain:live.chain,used:new Set(live.used),score:live.score,pauses:MAX_PAUSES};
+  if(live&&!Array.isArray(live.placed))store.del('live:'+TODAY.n);   // an unfinished v0.1 round
+  else if(live&&live.running){live.running=false;live.pauses++;store.set('live:'+TODAY.n,live)}
+  const l2=liveSaved(TODAY.n);
+  if(l2&&l2.pauses>MAX_PAUSES&&!saved(TODAY.n)){
+    S={r:puzzleFor(TODAY),secs:DAILY_SECONDS,placed:l2.placed,used:new Set(l2.used),score:l2.score,pauses:MAX_PAUSES,left:0};
     return finish('paused');
   }
   showStart();log('visit',{device:DEVICE});

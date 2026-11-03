@@ -17,36 +17,33 @@ tools/              scripts and source files for words, categories and the sched
 review/             spreadsheet of every word for you to check
 ```
 
-## Rules (what players see) · v0.1 beta
-1. Each daily shows a place (A HOSPITAL); the start word is revealed when the round begins.
-2. Name as many things as you can, each one smaller than the last. 60 seconds. Everyday items, no proper nouns.
-3. The tighter the fit, the more it scores. Specific, on-theme and rare words score extra.
-4. The run ends when time is up, or when you reach something with nothing smaller (bacteria, a germ). No hidden bottom and no bottom bonus.
-5. Pause from the top-left button: it goes back home and freezes the clock. Two pauses per daily; a third ends it. Closing or reloading mid-round counts as a pause.
+## Rules (what players see) · v0.2 beta
+1. Each daily is a big word and a small word about 8 sizes apart (one size = 1.5×), revealed when the round starts. Example: BATHTUB → GARLIC.
+2. In 60 seconds, name 7 things that fit between them, in any order. Everyday things, no proper nouns.
+3. Lenient on purpose: a word counts if it's clearly between the ends and at least half a size from your other words. There are about 14 half-size spots and you need any 7. The round ends early once all 7 are in.
+4. Pause from the top-left: two pauses per daily, a third ends it. Closing or reloading mid-round counts as a pause.
 
-Menu: your stats, six badges, history, settings (dark mode, animations), clear results. Admin stats and word review live at /admin.html. The sun/moon button switches light and dark.
+Results list everything biggest to smallest, with each word's % (how common in English until a daily has 25+ rounds, then the share of players who said it). Sizes you skipped show common answers.
 
-## Scoring (the "How scoring works" screen explains this to players)
-Sizes use a scale where one size = 1.5x. `words.json` stores each word's exact size on that scale (24.13), so words inside one size can still be ordered.
-Each word scores up to 100. Points add up:
-| Part | Points |
+## Scoring
+| Per word (max 100) | Points |
 | --- | --- |
-| Perfect fit: at least ~10% smaller but less than one size | 50 |
-| Snug fit: one size down, or smaller by less than ~10% | 40 |
-| 2 / 3 / 4 / 5 / 6 sizes | 30 / 25 / 20 / 15 / 10 |
-| Kind of: same size but a kind of the last thing (DOCTOR after PERSON) | 25 |
-| On theme | +20 |
+| Fits in the gap | 50 |
 | Specific: +5 per level below the everyday word | up to +15 |
-| Rare | +5 / +10 / +15 |
-| 7+ sizes, the same size and not a kind of it (NURSE after DOCTOR), or bigger | not allowed |
-- Played in the last 7 days: the word's total is halved, recovering to full over the week. A strong round is roughly 600–900.
-- Rare words show a %: "rarer than 65% of words" (everyday-English frequency among the plain words) until a daily has 25+ rounds, then "only 4% of players".
-- People: occupations and roles (doctor, nurse, umpire, camper…) are person-sized and count as a kind of person (`tools/sizes/sizes_zz.txt`, `specific_extra.tsv`).
-- Results: your path with tags, where you stopped → the smallest on-theme thing on the place's list, a typical path to reveal, share text with ⭐ perfect · 🟦 snug · 🟨 tight/good · ⬜ big · 🔹 kind of.
+| Rare | +5 / +10 / +15 / +20 |
+| Next down: smaller than the word you named before it | +10 |
+| Played in the last 7 days | half, recovering over the week |
+
+| Round bonus | Points |
+| --- | --- |
+| All 7 filled | +100 |
+| Even steps: one word in each of the 7 sizes between the ends | +50 |
+| Finished early | +2 per second left |
+
+Ranking is by total points, so filling all 7 matters most and rare, specific words decide between full ladders.
 
 ## Daily schedule
-Daily #1 is Nov 3 2026. `tools/categories.txt` has 40 starter categories (NAME | start word | typical things). The schedule shuffles them and uses each once before repeating, so 40 categories = 40 days without a repeat. Add categories to reach 365, then run `python3 tools/make_dailies.py 2026-11-03 365` (keep the same start date so numbers don't shift).
-Other everyday names for things (MED KIT → FIRST AID KIT) live in `tools/sizes/aliases.txt`.
+`tools/make_pairs.py 2026-11-03 365` builds `data/dailies.json`: well-known words (from the place lists in `tools/categories.txt` plus very common words) paired about 8 sizes apart, only where every size in between has at least 5 everyday words. A word comes back as an end at most every 40 days, and no pair repeats. Words that make confusing ends (BAT, CHIP, MATCH…) are listed in `tools/pair_avoid.txt`; add to it and rerun to swap any you don't like.
 
 ## Going live (about 15 minutes, Netlify only)
 

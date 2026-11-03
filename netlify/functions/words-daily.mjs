@@ -2,9 +2,9 @@
 // DIFFERENT players typed each one.
 //   AUTO_PLAYERS (default 5) or more players -> added automatically ("auto"), live in the game right away
 //   REVIEW_PLAYERS (default 2) or more       -> waits for you in admin.html ("review")
-// Size: players type a word right after something bigger, so it's sized about one size (1.5x)
-// smaller than the usual thing they typed it after. If players disagree a lot about where it goes,
-// it waits for review even with 5+ players. Anything you add, fix, reject or ignore wins.
+// Size: each player typed it into the gap between that day's two ends, so it's somewhere in that range.
+// It's added automatically only when the ranges narrow it to 3 sizes or less (e.g. from different dailies);
+// otherwise it waits for review with a best guess. Anything you add, fix, reject or ignore wins.
 // Env: AUTO_PLAYERS, REVIEW_PLAYERS, BLOCKED_WORDS (comma list), all optional
 import { db, day, tierOf, cmOf, keys, rebuildLive } from '../lib/db.mjs';
 export const config = { schedule: '@daily' };
@@ -29,16 +29,18 @@ export async function run(store, when = day(-1)) {
     const players = new Set(es.map((e) => e.device)).size;
     if (players < REVIEW || known.has(word) || BLOCKED.has(word) || !/^[a-z][a-z_]{2,29}$/.test(word)) continue;
     const rows = (await Promise.all(es.map((e) => store.get(e.key, { type: 'json' }).catch(() => null)))).filter(Boolean);
-    const sizes = rows.map((r) => +r.size).filter((x) => Number.isFinite(x) && x > 0);
-    if (!sizes.length) continue;
-    const at = Math.max(1, quantile(sizes, 0.5) - 1);
-    const spread = quantile(sizes, 0.75) - quantile(sizes, 0.25);
-    const after = Object.entries(rows.reduce((m, r) => (r.container && (m[r.container] = (m[r.container] || 0) + 1), m), {}))
-      .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c]) => c.replace(/_/g, ' '));
-    const status = players >= AUTO && spread <= 3 ? 'auto' : 'review';
+    // each player's gap says "somewhere between lo and hi"; where the gaps overlap is the word's likely size.
+    // Words typed on only one daily share one 8-size gap, so they wait for review until other dailies narrow it down.
+    const gaps = rows.filter((r) => r.lo && r.hi);
+    if (!gaps.length) continue;
+    const lo = Math.max(...gaps.map((g) => g.lo)), hi = Math.min(...gaps.map((g) => g.hi));
+    const width = hi - lo, puzzles = new Set(rows.map((r) => r.puzzle)).size;
+    const at = Math.max(1, width > 0 ? (lo + hi) / 2 : quantile(gaps.map((g) => (g.lo + g.hi) / 2), 0.5));
+    const status = players >= AUTO && width > 0 && width <= 3 ? 'auto' : 'review';
+    const why = width <= 0 ? ' · players placed it in gaps that don\'t overlap' : width > 3 ? ` · could be anywhere in a ${width.toFixed(1)}-size range` : '';
     const size_cm = cmOf(at);
     await store.setJSON(`words/${word}`, { word, size_cm, tier: tierOf(size_cm), pop: 2, players, status, parent: null,
-      note: `typed by ${players} players on ${when}, usually after ${after.join(', ') || '?'}${spread > 3 ? ' · players disagree on its size' : ''}`,
+      note: `typed by ${players} players on ${when} (${puzzles} daily${puzzles === 1 ? '' : 's'})${why}`,
       created: new Date().toISOString() });
     decided[status].push(word);
   }

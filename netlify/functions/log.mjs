@@ -1,6 +1,6 @@
 // POST /.netlify/functions/log  (anonymous; nobody needs an account)
 // { kind: "visit", device }
-// { kind: "miss", word, puzzle, container, containerSize, device }  an unknown word, kept once per player per day
+// { kind: "miss", word, puzzle, lo, hi, device }   an unknown word typed into the gap lo..hi, once per player per day
 // { kind: "play", puzzle, words, score, reached, steps, device }     a finished daily
 import { db, clean, cleanDevice, day } from '../lib/db.mjs';
 
@@ -19,9 +19,9 @@ export default async (req) => {
   if (b.kind === 'miss') {
     const word = clean(b.word);
     if (word.length < 3) return new Response('skip');
-    const size = Number(b.containerSize);
-    await store.setJSON(`misses/${today}/${word}/${device}`,
-      { container: clean(b.container) || null, size: Number.isFinite(size) && size > 0 && size < 100 ? size : null, puzzle });
+    // v0.2: the word was typed into the gap between the day's two ends, so it's somewhere between lo and hi
+    const num = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 && n < 100 ? n : null; };
+    await store.setJSON(`misses/${today}/${word}/${device}`, { lo: num(b.lo), hi: num(b.hi), puzzle });
     return new Response('ok');
   }
   if (b.kind === 'play' && puzzle) {
