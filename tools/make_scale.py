@@ -1,6 +1,6 @@
 """Build data/items.json and data/dailies.json for v0.5 "Banana for Scale".
-Items come from tools/scale_items.txt. Each daily has 5 rounds: "How many [unit] [long/tall/across] is [thing]?"
-The answers spread from small (5-30) to big (1,000-20,000), the unit is always something smaller and
+Items come from tools/scale_items.txt. Each daily has 6 rounds: "How many [unit] [long/tall/across] is [thing]?"
+The answers spread from small (3-20) to big (2,000-50,000), the unit is always something smaller and
 familiar, and a thing being measured doesn't come back within 10 days.
 Usage: python3 tools/make_scale.py 2026-11-03 365
 """
@@ -16,7 +16,7 @@ for line in open(os.path.join(HERE, 'scale_items.txt')):
     items.append({'id': len(items), 'name': p[0], 'plural': p[1], 'art': p[2], 'dim': p[3], 'cm': float(p[4]), 'unit': len(p) > 5 and p[5] == 'u'})
 json.dump(items, open(os.path.join(HERE, '..', 'data', 'items.json'), 'w'), separators=(',', ':'))
 units = [i for i in items if i['unit']]
-BUCKETS = [(5, 30), (20, 200), (60, 600), (200, 2500), (1000, 20000)]
+BUCKETS = [(3, 20), (15, 80), (50, 300), (150, 1500), (500, 6000), (2000, 50000)]  # keep in sync with BUCKETS in index.html
 pairs = {k: [] for k in range(len(BUCKETS))}
 for a in units:
     for b in items:

@@ -17,19 +17,26 @@ tools/              scripts and source files for words, categories and the sched
 review/             spreadsheet of every word for you to check
 ```
 
-## Rules (what players see) · v0.5 beta "Banana for Scale"
-Five rounds a day, 20 seconds each. Every round asks one question in the same shape:
+## Rules (what players see) · v0.6 beta "Banana for Scale"
+Six rounds a day, 20 seconds each. Every round asks one question in the same shape:
 "How many bananas long is a school bus?" Players type a number (1200, 1,200 and 1.2k all work).
 
 ## Scoring
-How far off a guess is gets measured in multiples, the same in both directions.
-Within 10% of the answer = 100. 2x off ≈ 73, 5x off ≈ 31, 10x off or more = 0. Max 500 a day.
-Share marks: 🍌 90+, 🟨 60+, 🟫 30+, ⬜ under 30.
+Points = accuracy as a percent: the smaller of (guess, answer) divided by the bigger, times 100.
+Half or twice the answer = 50, 5x off = 20, 10x off = 10. Max 600 a day.
+Share marks: 🍌 90+, 🟨 70+, 🟫 40+, ⬜ under 40.
+
+## Quick play and challenges
+Quick play builds 6 random questions. Up to 1 hour after finishing one, the player can make a challenge link
+(`/?c=CODE`). Anyone with the link plays the same 6 questions once, for 24 hours. The creator can close it early.
+One open challenge per person (per device); joining others is unlimited. Server: `netlify/functions/challenge.mjs`
+(Netlify Blobs keys `challenges/`, `entries/`, `hosting/`). Scores are honor system: nothing stops someone looking things up.
 
 ## Daily schedule
-Items live in `tools/scale_items.txt` (`name | plural | article | long/tall/across | cm | u`, where `u` means it can be the counting unit).
+Items live in `tools/scale_items.txt` (`name | plural | article | long/tall/across/deep | cm | u`, where `u` means it can be the counting unit).
 Edit sizes there, then run `python3 tools/make_scale.py` to rebuild `data/items.json` and `data/dailies.json` (365 days from 2026-11-03).
-Each day mixes small to huge answers, and the thing being measured doesn't repeat within 10 days.
+Each day spreads its answers from small (3-20) to huge (2,000-50,000), and the thing measured doesn't repeat within 10 days.
+Challenges store item names, so keep names stable once live (changing a size is fine).
 
 ## Going live (about 15 minutes, Netlify only)
 
