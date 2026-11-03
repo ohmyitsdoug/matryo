@@ -259,12 +259,14 @@ const CFG=Object.assign({api:'/.netlify/functions'},window.MATRYO_CONFIG||{});
 const API=CFG.api;   // Netlify server functions: logging, shared stats, words added after launch
 const VERSION='0.4';
 // v0.4 "Snug": 7 quick rounds a day. Each round names a real space ("in a suitcase", "through a door").
-// In 20 seconds, name the biggest thing that still fits. Sizes are the longest side, on a scale where 1 size = 1.5x.
-//   a snug fit (within about 10% of the space, either way) = 100, falling to 10 for something 3+ sizes smaller
-//   clearly bigger than the space doesn't fit: try again while the clock runs
+// In 25 seconds, name the biggest thing that still fits. Sizes are the longest side, on a scale where 1 size = 1.5x.
+//   within 5% of the space's size = 100, sliding down to 10 for something 2.5 sizes (about 2.75x) smaller
+//   more than 5% bigger than the space doesn't fit: try again while the clock runs
 //   specific words count as a snugger fit: each level more specific than the everyday word = SPEC_CREDIT sizes
-const ROUNDS=7, ROUND_SECONDS=20, HEADSTART_MS=1000, MAX_PAUSES=2;
-const NEAR=0.26, FALL=3, SPEC_CREDIT=0.15, SPEC_MAX=0.45, MIN_PTS=10, MAX_PTS=100;
+const ROUNDS=7, ROUND_SECONDS=25, HEADSTART_MS=1000, MAX_PAUSES=2;
+// points are whole numbers: 100 within 5% of the space (TIGHT), sliding evenly down to 10 at FLOOR sizes smaller
+const TIGHT=Math.log(1.05)/Math.log(1.5), FLOOR=2.5, SPEC_CREDIT=0.1, SPEC_MAX=0.3, MIN_PTS=10, MAX_PTS=100;
+const NEAR=TIGHT, OPEN_OVER=0.75;   // open-top spaces (baskets, beds, anything "on", doors) take things that stick out ~35%
 const COOLDOWN_DAYS=7, MIN_PLAYS_FOR_STATS=25;
 const SITE='https://playsmidgen.com/?utm_source=matryo&utm_medium=game&utm_campaign=footer';
 const app=document.getElementById('app');
@@ -365,11 +367,11 @@ function judge(w,q,noSpec=false){
   const head=ALIAS[q.head]||q.head;   // CUPBOARD is filed as CABINET
   if(w===q.head||w===head||roots(w).includes(head)||roots(head).includes(w))return{no:'same'};
   const sizes=[EX[w],...(ALTS[w]||[])];
-  const fits=sizes.filter(s=>s<=q.cap+NEAR).sort((a,b)=>b-a);   // the biggest size that still fits
+  const fits=sizes.filter(s=>s<=q.cap+(q.open?OPEN_OVER:TIGHT)).sort((a,b)=>b-a);   // the biggest size that still fits
   if(!fits.length)return{no:'big'};
   const size=fits[0],gap=Math.max(0,q.cap-size),credit=noSpec?0:Math.min(SPEC_MAX,SPEC_CREDIT*specificity(w));
   const d=Math.max(0,gap-credit);
-  const p=d<=NEAR?MAX_PTS:Math.max(MIN_PTS,Math.round((MAX_PTS-(d-NEAR)/FALL*(MAX_PTS-MIN_PTS))/5)*5);
+  const p=d<=TIGHT?MAX_PTS:Math.max(MIN_PTS,Math.round(MAX_PTS-(d-TIGHT)/(FLOOR-TIGHT)*(MAX_PTS-MIN_PTS)));
   return{size,gap,credit,d,p};
 }
 const mark=p=>p>=100?'📦':p>=60?'🟧':p>=30?'🟨':'⬜';
@@ -379,12 +381,8 @@ function pctLabel(w){
   if(hasStats())return`said by ${STATS[w]||0}% of players`;
   const r=RANK(w);return r>=50?`rarer than ${r}% of words`:`top ${Math.max(1,r)}% most common`;
 }
-// everyday things that fit snugly (for the reveal)
-function snugWords(q,skip,n=3){
-  const near=KEYS.filter(w=>!PARENT[w]&&!ALTS[w]&&!skip.has(w)&&w!==q.head&&EX[w]<=q.cap+NEAR&&EX[w]>=q.cap-0.9);
-  const by=(a,b)=>Math.abs(EX[a]-q.cap)-Math.abs(EX[b]-q.cap);
-  return[...near.filter(w=>NICE.has(w)).sort(by),...near.filter(w=>!NICE.has(w)&&POP[w]>=4.2).sort(by)].slice(0,n);
-}
+// snug examples for a space: written by hand in tools/fits.txt
+function snugWords(q,skip,n=3){return(q.ex||[]).filter(w=>!skip.has(w.replace(/ /g,'_'))).slice(0,n)}
 function remember(words){const r=store.get('recent',{}),t=todayISO();words.forEach(w=>r[w]=t);
   for(const k in r)if((new Date(t)-new Date(r[k]))/864e5>COOLDOWN_DAYS)delete r[k];store.set('recent',r)}
 
@@ -479,7 +477,7 @@ function showStart(){
         <h1>How snug?</h1>
         <p class="lead">What's the biggest thing that still fits in a suitcase? Through a door? In your pocket?</p>
         <div style="width:100%;margin-top:4px">${squares(live?live.answers:res?res.answers:[])}
-          <div class="sqlabels" style="justify-content:center"><span>7 rounds · 20 seconds each</span></div></div>
+          <div class="sqlabels" style="justify-content:center"><span>7 rounds · 25 seconds each</span></div></div>
         <div class="fine">Everyday things, no names. The snugger the fit, the more it scores. <a href="#how" class="howlink" id="how">How scoring works</a></div>
       </div>
       <div class="cta in" style="--d:4">
@@ -500,13 +498,13 @@ function showStart(){
 function showHelp(){
   app.innerHTML=`${nav()}<div class="narrow help in" style="--d:1;display:flex;flex-direction:column;gap:12px">
     <div class="head"><h2>How it works</h2><button class="sq" id="back">Back</button></div>
-    <p>Each round names a space, like <b>in a suitcase</b> or <b>through a door</b>. You have 20 seconds to name the biggest thing that still fits. Seven rounds a day.</p>
-    <p class="note">Sizes are the longest side of an everyday version of the thing. A fit that's about the same size counts as snug, so close calls go your way.</p>
+    <p>Each round names a space, like <b>in a suitcase</b> or <b>through a door</b>. You have 25 seconds to name the biggest thing that still fits. Seven rounds a day.</p>
+    <p class="note">Sizes are the longest side of an everyday version of the thing, and the usable space inside. One size is about 1.5×. Open spaces (baskets, beds, tables, doorways) count things that stick out a bit: people stand in a hot air balloon basket.</p>
     <h3>POINTS EACH ROUND</h3>
     <table class="pt"><tbody>
-      <tr><td>A snug fit</td><td>100</td></tr>
-      <tr><td>Smaller, with room to spare</td><td>fewer, down to 10</td></tr>
-      <tr><td>Too big to fit</td><td>doesn't count: try again</td></tr>
+      <tr><td>Within 5% of the space's size</td><td>100</td></tr>
+      <tr><td>Smaller, with room to spare</td><td>fewer, every point counts: about 2½ sizes smaller is 10</td></tr>
+      <tr><td>More than 5% too big</td><td>doesn't fit: try again</td></tr>
       <tr><td>The space itself, or a kind of it (a suitcase in a suitcase)</td><td>doesn't count</td></tr>
     </tbody></table>
     <h3>SPECIFIC IS SNUGGER</h3>
@@ -674,25 +672,26 @@ function endRound(a){
   S.phase='reveal';S.clock=false;S.live=false;S.left=ROUND_SECONDS*1000;
   saveLive();showReveal();
 }
-// box-in-a-box: the space as a square, your thing as a square scaled by length (same scale as the sizes)
-function nest(q,a){
-  const ratio=a&&a.w?Math.min(1.08,1.5**(a.size-q.cap)):0;
-  const pct=Math.max(7,Math.round(ratio*100));
-  return`<div class="nest"><div class="outer"><span class="olab">${esc(q.phrase.replace(/^(in|on|through) (a |an |your )?/,''))}</span>
-    ${a&&a.w?`<div class="inner ${pct<34?'tiny':''}" style="width:${Math.min(100,pct)}%;height:${Math.min(100,pct)}%"><span>${esc(W(a.w))}</span></div>`:''}</div></div>`;
+// how snug it was, on a scale from 'rattles around' (left) to a perfect fit (right)
+function fitScale(q,a){
+  const pos=a&&a.w?Math.max(0,Math.min(100,100-(Math.max(0,a.d)/FLOOR)*100)):null;
+  return`<div class="scale">
+    <div class="track"><span class="tick" style="left:100%"></span>${pos!=null?`<div class="pin you" style="left:${pos.toFixed(1)}%"><span>${esc(W(a.w))}</span></div>`:''}</div>
+    <div class="scale-ends"><span class="mut">rattles around</span><b>snug fit</b></div>
+  </div>`;
 }
 function showReveal(){
   const q=S.r.qs[S.i],a=S.answers[S.i],last=S.i>=ROUNDS-1;
   const snug=snugWords(q,new Set([...S.used].filter(w=>!a||w!==a.w)));
-  const room=a&&a.w?(a.p>=MAX_PTS?(a.size>q.cap?'Snug! A tight squeeze, but it fits.':'Snug fit!'):a.gap<1?'Close: a little room to spare.':a.gap<2?'Fits, with room to spare.':'Fits, but it rattles around in there.'):'Out of time.';
+  const room=a&&a.w?(a.p>=MAX_PTS?(a.size>q.cap?'Snug! A tight squeeze, but it fits.':'Snug fit!'):a.p>=75?'Close: a little room to spare.':a.p>=40?'Fits, with room to spare.':'Fits, but it rattles around in there.'):'Out of time.';
   app.innerHTML=`<div class="page play reveal">
     <div class="main-col" style="display:flex;flex-direction:column;gap:14px">
       <div class="playtop in" style="--d:0"><button class="sq icon" id="pause" aria-label="Pause">${ICON.pause}</button><span class="timer">Round ${S.i+1}</span><span class="tag pts num">${S.i+1}/${ROUNDS} · ${fmt(S.score)}</span></div>
       <div class="in" style="--d:1">${squares(S.answers)}</div>
       <div class="in" style="--d:1;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><b class="score num">+${a.p||0}</b><span>${esc(room)}</span></div>
-      <div class="in" style="--d:2">${nest(q,a)}</div>
-      ${a&&a.w?`<div class="note in" style="--d:2">${esc(W(a.w))} ${esc(q.phrase)} · <span class="${RANK(a.w)>=70?'rare':''}">${esc(pctLabel(a.w))}</span>${a.credit?` · specific: counts ${a.credit.toFixed(2).replace(/0$/,'')} sizes snugger`:''}</div>`:''}
-      ${snug.length?`<div class="note in" style="--d:3">Snug fits: ${snug.map(w=>esc(W(w).toLowerCase())).join(', ')}</div>`:''}
+      <div class="in" style="--d:2">${fitScale(q,a)}</div>
+      ${a&&a.w?`<div class="note in" style="--d:2">${esc(W(a.w))} ${esc(q.phrase)} · <span class="${RANK(a.w)>=70?'rare':''}">${esc(pctLabel(a.w))}</span>${a.credit?' · specific, so it counts as a bit snugger':''}</div>`:''}
+      ${snug.length?`<div class="note in" style="--d:3">Snug fits ${esc(q.phrase)}: ${snug.map(w=>esc(w)).join(', ')}</div>`:''}
       <button class="btn main in" style="--d:3" id="next"><span>${last?'See results':'Next round'}</span><span aria-hidden="true">→</span></button>
     </div>
   </div>`;
@@ -743,7 +742,7 @@ async function showResults(r,res){
     <div class="in" style="--d:2"><div class="eyebrow" style="margin-bottom:4px">Your rounds</div>
       <div class="path">${r.qs.map((q,i)=>{const a=res.answers[i]||{},sn=snugWords(q,new Set(a.w?[a.w]:[]),1);
         return`<div class="prow round"><span class="i num">${i+1}</span><span class="w"><b>${esc(q.phrase.charAt(0).toUpperCase()+q.phrase.slice(1))}</b><br>
-          <span class="t">${a.w?`you: ${esc(W(a.w).toLowerCase())} · <span class="${RANK(a.w)>=70?'rare':''}">${esc(pctLabel(a.w))}</span>`:'no answer'}${sn[0]&&(!a.w||a.p<100)?` · snug: ${esc(W(sn[0]).toLowerCase())}`:''}</span></span>
+          <span class="t">${a.w?`you: ${esc(W(a.w).toLowerCase())} · <span class="${RANK(a.w)>=70?'rare':''}">${esc(pctLabel(a.w))}</span>`:'no answer'}${sn[0]&&(!a.w||a.p<100)?` · snug: ${esc(sn[0])}`:''}</span></span>
           <span class="num">${mark(a.p||0)} ${a.p||0}</span></div>`}).join('')}
       </div></div>
     <div class="share in" style="--d:4" id="sh"><span class="eyebrow">Share preview</span>\n${esc(shareTxt)}</div>

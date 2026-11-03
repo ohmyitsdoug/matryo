@@ -130,3 +130,14 @@
 12: ice_cream
 # people: occupations and roles are the size of a person and count as a kind of person
 200: grandma granny grandpa grandmother grandfather mom mother dad father sister brother wife husband student teacher doctor nurse police_officer cop firefighter chef farmer sailor pilot clown cowboy princess prince king queen surgeon dentist pharmacist paramedic janitor receptionist patient visitor ranger lifeguard waiter waitress cashier umpire referee coach catcher pitcher soldier astronaut knight pirate ninja wizard camper hiker guard librarian baker butcher mechanic plumber electrician scientist artist musician athlete
+# v0.4 Snug examples that were missing
+15: bird songbird
+20: tissue tissues
+40: houseplant potted_plant
+25: milk milk_carton
+11: juice_box
+10: fishing_reel
+8: lure fishing_lure
+60: child_seat
+28: cereal_bag
+70: bag_of_soil

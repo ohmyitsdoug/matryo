@@ -19,18 +19,18 @@ review/             spreadsheet of every word for you to check
 
 ## Rules (what players see) · v0.4 beta "Snug"
 1. Seven quick rounds a day. Each names a real space: in a suitcase, through a door, on a table, in your pants pocket, on a sofa.
-2. You have 20 seconds to name the biggest thing that still fits.
-3. After each round, a box-in-a-box drawing shows how much of the space your thing fills, plus a few snug answers. Tap Next for the next round.
+2. You have 25 seconds to name the biggest thing that still fits.
+3. After each round, a scale shows how snug your fit was (rattles around → snug fit), plus hand-picked snug answers. Tap Next for the next round.
 4. Pause from the top-left: two pauses per daily, a third ends it. Closing or reloading mid-round counts as a pause.
 
 ## Scoring
-- A snug fit (within about 10% of the space's size, either way) = 100. Smaller things score less, down to 10 for something 3+ sizes smaller (one size = 1.5×).
-- Clearly too big doesn't fit: try again while the clock runs. The space itself and kinds of it (suitcase in a suitcase) don't count.
-- Specific is snugger: each level more specific than the everyday word counts 0.15 sizes closer (up to 0.45).
+- Within 5% of the space's size = 100. Smaller things score whole-number points sliding down to 10 at about 2.5 sizes smaller (one size = 1.5×).
+- More than 5% too big doesn't fit: try again while the clock runs. Open spaces (baskets, carts, beds, anything "on", doors and elevators, which you can tilt things through) accept things up to ~35% bigger. The space itself and kinds of it don't count.
+- Specific is snugger: each level more specific than the everyday word counts 0.1 sizes closer (up to 0.3).
 - A day is out of 700. Share marks: 📦 perfect fit · 🟧 60+ · 🟨 30+ · ⬜ under 30. Each word shows its % and can be used once a day.
 
 ## Daily schedule
-The spaces live in `tools/fits.txt` (`phrase | word | longest thing that fits, in cm`). `python3 tools/make_snug.py 2026-11-03 365` writes `data/fits.json` and `data/dailies.json`: 2 small, 3 medium and 2 big spaces a day, in a random order, every space used once before any repeat (120 spaces ≈ a repeat every 17 days; add lines to stretch that).
+The spaces live in `tools/fits.txt` (`phrase | word | usable inside size in cm | snug examples`). The build checks every example against the game's own sizes and only shows the ones that score 60+; it prints spaces with fewer than 2 good examples so you can tune them. `python3 tools/make_snug.py 2026-11-03 365` writes `data/fits.json` and `data/dailies.json`: 2 small, 3 medium and 2 big spaces a day, in a random order, every space used once before any repeat (120 spaces ≈ a repeat every 17 days; add lines to stretch that).
 
 ## Going live (about 15 minutes, Netlify only)
 
